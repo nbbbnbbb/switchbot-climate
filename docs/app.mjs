@@ -1,4 +1,4 @@
-import {COLORS, pointsFor, stats, segments, csvCell} from './chart.mjs';
+import {COLORS, pointsFor, stats, segments, csvCell, isStale} from './chart.mjs';
 const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
@@ -25,22 +25,22 @@ async function load(){
 }
 function render(){
   const times=sensors.map(s=>Date.parse(s.collectedAt)).filter(Number.isFinite), last=times.length?Math.max(...times):null;
-  const stale=!last||Date.now()-last>20*60000;
+  const stale=!last||Date.now()-last>5*60000;
   const healthy=status.state==='ok'&&!stale;
   $('status-dot').className='dot '+(demo||healthy?'ok':sensors.length?'error':'');
-  $('connection-label').textContent=demo?'サンプル表示':healthy?'記録中':sensors.length?'取得状況を確認':'未接続';
-  $('last-update').textContent=last?'最終取得 '+date.format(last):'実データはまだありません';
+  $('connection-label').textContent=demo?'サンプル表示':healthy?'記録中':sensors.length?(stale?'更新遅延':'取得状況を確認'):'未接続';
+  $('last-update').textContent=last?'最終取得 '+date.format(last)+'（'+Math.max(0,Math.floor((Date.now()-last)/60000))+'分前）':'実データはまだありません';
   $('setup').hidden=Boolean(sensors.length)&&!demo;
   $('demo-toggle').textContent=demo?'サンプル表示を終了する →':'サンプルデータで表示を試す →';
-  if(!demo&&last&&stale&&!$('notice').textContent)notify('最後の取得から20分以上経過しています。表示されている値は現在値ではない可能性があります。');
+  if(!demo&&last&&stale&&!$('notice').textContent)notify('最後の取得から5分以上経過しています。収集が遅延または停止している可能性があります。表示値の取得日時を確認してください。');
   $('sensor-cards').replaceChildren();
   sensors.forEach((s,i)=>{
     const card=el('article',undefined,'sensor-card');card.style.setProperty('--sensor',COLORS[i%COLORS.length]);
     const title=el('h2',undefined,'sensor-name');title.append(el('i'),document.createTextNode(s.name));card.append(title);
     const values=el('div',undefined,'card-values');
     for(const [key,label,unit]of [['temperature','温度','°C'],['humidity','湿度','%']]){const box=el('div');box.append(el('small',label));const number=el('div',finite(s[key])?s[key].toFixed(key==='temperature'?1:0):'—','value');number.append(el('span',unit));box.append(number);values.append(box);}card.append(values);
-    const isStale=s.state!=='ok'||!s.collectedAt||Date.now()-Date.parse(s.collectedAt)>20*60000;
-    card.append(el('p',(demo?'サンプル · ':isStale?'最終取得値 · ':'取得 ')+(s.collectedAt?date.format(Date.parse(s.collectedAt)):'未取得'),'card-time'+(isStale?' stale':'')));
+    const outdated=s.state!=='ok'||isStale(s.collectedAt);
+    card.append(el('p',(demo?'サンプル · ':outdated?'最終取得値 · ':'取得 ')+(s.collectedAt?date.format(Date.parse(s.collectedAt)):'未取得'),'card-time'+(outdated?' stale':'')));
     $('sensor-cards').append(card);
   });
   $('legend').replaceChildren();sensors.forEach((s,i)=>{const label=el('label');label.style.setProperty('--sensor',COLORS[i%COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hidden.has(s.id);input.addEventListener('change',()=>{input.checked?hidden.delete(s.id):hidden.add(s.id);draw();});label.append(input,document.createTextNode(s.name));$('legend').append(label);});draw();
@@ -83,3 +83,4 @@ document.querySelectorAll('[data-days]').forEach(button=>button.addEventListener
 document.querySelectorAll('[data-metric]').forEach(button=>button.addEventListener('click',()=>{metric=button.dataset.metric;document.querySelectorAll('[data-metric]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));draw();}));
 $('csv').addEventListener('click',()=>{const names=new Map(sensors.map(s=>[s.id,s.name]));const records=[['取得日時（UTC）','センサー','温度（°C）','湿度（%）','データ種別']];for(const row of selectedRows())for(const [id,v]of Object.entries(row.values))if(!hidden.has(id))records.push([row.at,names.get(id)||id,v.temperature,v.humidity,demo?'サンプル':'API取得値']);const blob=new Blob(['\ufeff'+records.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=(demo?'sample-':'')+'climate-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 load();setInterval(()=>{if(!document.hidden&&!demo)load();},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!demo)load();});

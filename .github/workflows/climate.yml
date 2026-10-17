@@ -8,6 +8,10 @@ on:
     - cron: '2-59/10 * * * *'
   workflow_dispatch:
     inputs:
+      continuous:
+        description: Automatically continue with the next sampling window
+        type: boolean
+        default: true
       samples:
         description: Number of two-minute samples (5 for normal operation; 2 for verification)
         type: choice
@@ -26,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      actions: write
       contents: write
       pages: write
       id-token: write
@@ -116,3 +121,9 @@ jobs:
         run: |
           echo 'One or more sample cycles failed. Check the cycle logs and published status.'
           exit 1
+      - name: Queue next sampling window
+        if: always() && !cancelled() && steps.connection.outputs.configured == 'true' && (github.event_name != 'workflow_dispatch' || inputs.continuous)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLIMATE_SAMPLE_COUNT: ${{ github.event_name == 'push' && '1' || inputs.samples || '5' }}
+        run: python3 scripts/dispatch_next.py

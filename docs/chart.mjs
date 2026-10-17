@@ -1,4 +1,8 @@
 export const COLORS = ['#3269b2', '#168377', '#b7653d', '#855ca7', '#b28c24', '#b25070'];
+export function isStale(at, now=Date.now()) {
+  const timestamp=Date.parse(at);
+  return !Number.isFinite(timestamp)||now-timestamp>5*60000;
+}
 export function pointsFor(rows, id, metric, since) {
   return rows.map(r => ({at: Date.parse(r.at), value: r.values?.[id]?.[metric]}))
     .filter(p => Number.isFinite(p.at) && p.at >= since && Number.isFinite(p.value)).sort((a,b)=>a.at-b.at);
