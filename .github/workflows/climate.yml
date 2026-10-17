@@ -5,8 +5,14 @@ on:
     branches: [main]
     paths-ignore: ['docs/data/**', 'README.md']
   schedule:
-    - cron: '2-59/5 * * * *'
+    - cron: '2-59/10 * * * *'
   workflow_dispatch:
+    inputs:
+      samples:
+        description: Number of two-minute samples (5 for normal operation; 2 for verification)
+        type: choice
+        options: ['5', '2', '1']
+        default: '5'
 
 permissions:
   contents: read
@@ -18,14 +24,14 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
       pages: write
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.sample1.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
       - name: Check connection configuration
@@ -39,45 +45,74 @@ jobs:
           else
             echo 'configured=false' >> "$GITHUB_OUTPUT"
           fi
-      - name: Test collector
+      - name: Test collector and scheduling
         if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
         run: |
           python3 -m unittest discover -s tests -v
           node --test tests/chart.test.mjs
-      - name: Collect readings
-        id: collect
-        if: steps.connection.outputs.configured == 'true'
-        continue-on-error: true
-        env:
-          SWITCHBOT_TOKEN: ${{ secrets.SWITCHBOT_TOKEN }}
-          SWITCHBOT_SECRET: ${{ secrets.SWITCHBOT_SECRET }}
-          SWITCHBOT_DEVICES: ${{ secrets.SWITCHBOT_DEVICES }}
-        run: python3 scripts/collect.py
-      - name: Save public readings
-        if: steps.connection.outputs.configured == 'true'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/data
-          if ! git diff --cached --quiet; then
-            git commit -m 'Update public climate readings'
-            git push
-          fi
       - name: Configure Pages
         if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
         uses: actions/configure-pages@v5
-      - name: Upload public site
+      - name: Start ten-minute sampling window
         if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
-        uses: actions/upload-pages-artifact@v4
+        run: echo "CLIMATE_WINDOW_START=$(date +%s)" >> "$GITHUB_ENV"
+      - name: Sample 1 and publish
+        id: sample1
+        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
+        continue-on-error: true
+        uses: ./.github/actions/sample-and-publish
         with:
-          path: docs
-          retention-days: 1
-      - name: Deploy Pages
-        id: deployment
-        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
-        uses: actions/deploy-pages@v4
-      - name: Report collection failure after publishing status
-        if: steps.collect.outcome == 'failure'
+          slot: '1'
+          configured: ${{ steps.connection.outputs.configured }}
+          token: ${{ secrets.SWITCHBOT_TOKEN }}
+          secret: ${{ secrets.SWITCHBOT_SECRET }}
+          devices: ${{ secrets.SWITCHBOT_DEVICES }}
+      - name: Sample 2 and publish
+        id: sample2
+        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 2))
+        continue-on-error: true
+        uses: ./.github/actions/sample-and-publish
+        with:
+          slot: '2'
+          configured: ${{ steps.connection.outputs.configured }}
+          token: ${{ secrets.SWITCHBOT_TOKEN }}
+          secret: ${{ secrets.SWITCHBOT_SECRET }}
+          devices: ${{ secrets.SWITCHBOT_DEVICES }}
+      - name: Sample 3 and publish
+        id: sample3
+        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 3))
+        continue-on-error: true
+        uses: ./.github/actions/sample-and-publish
+        with:
+          slot: '3'
+          configured: ${{ steps.connection.outputs.configured }}
+          token: ${{ secrets.SWITCHBOT_TOKEN }}
+          secret: ${{ secrets.SWITCHBOT_SECRET }}
+          devices: ${{ secrets.SWITCHBOT_DEVICES }}
+      - name: Sample 4 and publish
+        id: sample4
+        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 4))
+        continue-on-error: true
+        uses: ./.github/actions/sample-and-publish
+        with:
+          slot: '4'
+          configured: ${{ steps.connection.outputs.configured }}
+          token: ${{ secrets.SWITCHBOT_TOKEN }}
+          secret: ${{ secrets.SWITCHBOT_SECRET }}
+          devices: ${{ secrets.SWITCHBOT_DEVICES }}
+      - name: Sample 5 and publish
+        id: sample5
+        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 5))
+        continue-on-error: true
+        uses: ./.github/actions/sample-and-publish
+        with:
+          slot: '5'
+          configured: ${{ steps.connection.outputs.configured }}
+          token: ${{ secrets.SWITCHBOT_TOKEN }}
+          secret: ${{ secrets.SWITCHBOT_SECRET }}
+          devices: ${{ secrets.SWITCHBOT_DEVICES }}
+      - name: Report failed sample cycles
+        if: always() && contains(steps.*.outcome, 'failure')
         run: |
-          echo 'Collection failed. The page displays the last successful readings and an error status.'
+          echo 'One or more sample cycles failed. Check the cycle logs and published status.'
           exit 1
