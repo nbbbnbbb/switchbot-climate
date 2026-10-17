@@ -78,16 +78,26 @@ class CollectorTests(unittest.TestCase):
         self.run_collection(response)
         self.assertEqual(len(self.read("history/2026-10.json")), 1)
 
-    def test_auto_discovery_does_not_publish_private_room_name(self):
+    def test_auto_discovery_syncs_app_name_and_preserves_history_on_rename(self):
         env = {k: v for k, v in self.env.items() if k != "SWITCHBOT_DEVICES"}
+        app_name = "展示室・東"
         def response(path, *args):
             if path == "devices":
-                return {"deviceList": [{"deviceId": "private-id", "deviceName": "private room", "deviceType": "Meter"}, {"deviceId": "lock-id", "deviceType": "Lock"}]}
+                return {"deviceList": [{"deviceId": "private-id", "deviceName": app_name, "deviceType": "Meter"}, {"deviceId": "lock-id", "deviceType": "Lock"}]}
             return {"temperature": 22, "humidity": 50}
         self.assertEqual(self.run_collection(response, env), 0)
         sensor = self.read("latest.json")["sensors"][0]
-        self.assertEqual(sensor["name"], "センサー 1")
-        self.assertNotIn("private", json.dumps(self.read("latest.json")))
+        self.assertEqual(sensor["name"], app_name)
+        self.assertNotIn("private-id", json.dumps(self.read("latest.json")))
+        app_name = "展示室・西"
+        self.now = datetime(2026, 10, 17, 1, 5, tzinfo=timezone.utc)
+        self.assertEqual(self.run_collection(response, env), 0)
+        renamed = self.read("latest.json")["sensors"][0]
+        self.assertEqual(renamed["name"], app_name)
+        self.assertEqual(renamed["id"], sensor["id"])
+        history = self.read("history/2026-10.json")
+        self.assertEqual(len(history), 2)
+        self.assertTrue(all(sensor["id"] in row["values"] for row in history))
 
     def test_month_rollover_keeps_both_months(self):
         response = lambda *args: {"temperature": 23, "humidity": 50}

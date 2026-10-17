@@ -98,7 +98,9 @@ def collect(data_dir=ROOT / "docs/data", env=None, request=api, now=None):
                 if device.get("deviceType") in SUPPORTED:
                     device_id = device["deviceId"]
                     alias = "sensor-" + hmac.new(secret.encode(), device_id.encode(), hashlib.sha256).hexdigest()[:12]
-                    devices.append({"id": device_id, "alias": alias, "name": f"センサー {len(devices) + 1}"})
+                    app_name = device.get("deviceName")
+                    name = app_name if isinstance(app_name, str) and app_name.strip() else f"センサー {len(devices) + 1}"
+                    devices.append({"id": device_id, "alias": alias, "name": name})
         if not devices:
             raise ValueError("No supported meters")
     except Exception:
