@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="SwitchBot温湿度計の記録を、日々の変化がわかるグラフで。">
+  <meta name="color-scheme" content="light">
+  <title>Climate Log — 温度と湿度の記録</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="./"><span class="brand-icon" aria-hidden="true">◒</span> Climate Log</a><span class="top-caption">温度と湿度の記録</span><button id="refresh" class="refresh" type="button">↻ <span>更新</span></button></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">YOUR SPACE, OVER TIME</p><h1>空間の変化を、<br class="mobile-break">ひと目で。</h1><p class="subtitle">温度と湿度の小さな変化を記録します。</p></div><div class="connection"><span id="status-dot" class="dot"></span><span id="connection-label">読み込み中</span><small id="last-update">取得状態を確認しています</small></div></div>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section id="setup" class="setup" hidden aria-labelledby="setup-title"><span class="setup-icon" aria-hidden="true">⌁</span><div><p class="eyebrow">READY TO CONNECT</p><h2 id="setup-title">最初の記録を待っています</h2><p>GitHubにSwitchBotの接続情報を登録すると、ここに実際の温度と湿度が表示されます。</p><ol><li>SwitchBotアプリでToken・Secretを取得</li><li>リポジトリのActions secretsに登録</li><li>Actionsから「Collect and publish climate」を実行</li></ol><p class="setup-note">APIキーをこのページに入力する必要はありません。詳しい手順はリポジトリのREADMEをご覧ください。</p><button id="demo-toggle" class="text-button" type="button">サンプルデータで表示を試す →</button></div></section>
+    <section id="sensor-cards" class="sensor-cards" aria-label="センサーの現在値"></section>
+    <section class="chart-panel" aria-labelledby="chart-title"><div class="panel-heading"><div><p class="eyebrow">HISTORY</p><h2 id="chart-title">温湿度の推移</h2></div><div class="periods" role="group" aria-label="表示期間"><button type="button" data-days="1" aria-pressed="true">24時間</button><button type="button" data-days="7" aria-pressed="false">7日</button><button type="button" data-days="30" aria-pressed="false">30日</button><button type="button" data-days="90" aria-pressed="false">90日</button></div></div>
+      <div class="chart-controls"><div class="metrics" role="group" aria-label="表示項目"><button type="button" data-metric="temperature" aria-pressed="true">温度 <span>°C</span></button><button type="button" data-metric="humidity" aria-pressed="false">湿度 <span>%</span></button></div><span id="range-label" class="range-label"></span></div>
+      <div id="legend" class="legend" aria-label="表示センサー"></div>
+      <div class="chart-wrap"><svg id="chart" viewBox="0 0 1000 330" role="img" aria-label="温湿度の推移グラフ"><title>温湿度の推移</title></svg><div id="chart-empty" class="chart-empty"><span>まだ記録がありません</span><small>接続後のデータが、ここに少しずつ積み重なります。</small></div><div id="tooltip" class="tooltip" hidden></div></div>
+      <div class="chart-footer"><span>日時は日本時間（JST）／値はAPI取得時点の記録</span><button id="csv" class="text-button" type="button" disabled>CSVをダウンロード ↓</button></div>
+    </section>
+    <section class="details"><div><p class="eyebrow">AT A GLANCE</p><h2>期間のまとめ</h2><p>選択した期間に取得できた値から計算します。</p></div><div class="table-wrap"><table><thead><tr><th scope="col">センサー</th><th scope="col">最低</th><th scope="col">平均</th><th scope="col">最高</th><th scope="col">記録数</th></tr></thead><tbody id="summary"><tr><td colspan="5">記録待ち</td></tr></tbody></table></div></section>
+    <details class="readings"><summary>グラフの値を表で確認する（直近100件）</summary><div class="table-wrap"><table><thead><tr><th>取得日時（JST）</th><th>センサー</th><th>温度 °C</th><th>湿度 %</th></tr></thead><tbody id="readings"></tbody></table></div></details>
+    <footer><span>Climate Log <span class="footer-divider">/</span> Powered by SwitchBot Open API</span><span>約5分ごとに収集・画面は1分ごとに再読込</span><p>実行遅延やクラウド側の更新間隔により、リアルタイムの測定値とは異なる場合があります。20分を超える取得の空白は線をつなぎません。</p></footer>
+  </main><script type="module" src="./app.mjs"></script>
+</body>
+</html>

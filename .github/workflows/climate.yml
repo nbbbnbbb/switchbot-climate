@@ -1,0 +1,83 @@
+name: Collect and publish climate
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/data/**', 'README.md']
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: climate-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check connection configuration
+        id: connection
+        env:
+          SWITCHBOT_TOKEN: ${{ secrets.SWITCHBOT_TOKEN }}
+          SWITCHBOT_SECRET: ${{ secrets.SWITCHBOT_SECRET }}
+        run: |
+          if [ -n "$SWITCHBOT_TOKEN" ] && [ -n "$SWITCHBOT_SECRET" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Test collector
+        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
+        run: |
+          python3 -m unittest discover -s tests -v
+          node --test tests/chart.test.mjs
+      - name: Collect readings
+        id: collect
+        if: steps.connection.outputs.configured == 'true'
+        continue-on-error: true
+        env:
+          SWITCHBOT_TOKEN: ${{ secrets.SWITCHBOT_TOKEN }}
+          SWITCHBOT_SECRET: ${{ secrets.SWITCHBOT_SECRET }}
+          SWITCHBOT_DEVICES: ${{ secrets.SWITCHBOT_DEVICES }}
+        run: python3 scripts/collect.py
+      - name: Save public readings
+        if: steps.connection.outputs.configured == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/data
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update public climate readings'
+            git push
+          fi
+      - name: Configure Pages
+        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
+        uses: actions/configure-pages@v5
+      - name: Upload public site
+        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs
+          retention-days: 1
+      - name: Deploy Pages
+        id: deployment
+        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
+        uses: actions/deploy-pages@v4
+      - name: Report collection failure after publishing status
+        if: steps.collect.outcome == 'failure'
+        run: |
+          echo 'Collection failed. The page displays the last successful readings and an error status.'
+          exit 1
