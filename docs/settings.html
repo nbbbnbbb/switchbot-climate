@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="description" content="Climate Logの全閲覧者に適用する共有表示設定。"><title>共有設定 — Climate Log</title><link rel="stylesheet" href="./style.css?v=2"></head>
+<body>
+  <header class="topbar"><a class="brand" href="./"><span class="brand-icon" aria-hidden="true">◒</span> Climate Log</a><span class="top-caption">共有設定</span><a class="settings-link" href="./">グラフへ戻る →</a></header>
+  <main class="settings-main">
+    <div class="intro"><div><p class="eyebrow">SHARED PREFERENCES</p><h1>見たい範囲を、<br class="mobile-break">みんなに。</h1><p class="subtitle">保存した設定は、このページを見るすべてのユーザーに適用されます。</p></div><span class="shared-badge">全ユーザー共通</span></div>
+    <div id="settings-message" class="notice" role="status" aria-live="polite">共有設定を読み込んでいます。</div>
+    <form id="settings-form">
+      <section class="settings-section" aria-labelledby="axes-title"><div class="settings-section-title"><p class="eyebrow">01 / AXES</p><h2 id="axes-title">グラフの表示範囲</h2><p>最小値・最大値をそれぞれ指定できます。「自動」をオンにすると、表示中のデータに合わせます。</p></div><div class="settings-section-body">
+        <fieldset class="axis-card"><legend>温度 <span>°C</span></legend><div class="axis-fields">
+          <div class="field"><label for="temperature-min">最小値</label><div class="number-with-unit"><input id="temperature-min" aria-label="温度の最小値" type="number" min="-100" max="149.9" step="0.1" value="15" disabled><span>°C</span></div><label class="check"><input id="temperature-min-auto" type="checkbox" checked>温度の最小値を自動で設定</label></div>
+          <div class="field"><label for="temperature-max">最大値</label><div class="number-with-unit"><input id="temperature-max" aria-label="温度の最大値" type="number" min="-99.9" max="150" step="0.1" value="30" disabled><span>°C</span></div><label class="check"><input id="temperature-max-auto" type="checkbox" checked>温度の最大値を自動で設定</label></div>
+        </div></fieldset>
+        <fieldset class="axis-card"><legend>湿度 <span>%</span></legend><div class="axis-fields">
+          <div class="field"><label for="humidity-min">最小値</label><div class="number-with-unit"><input id="humidity-min" aria-label="湿度の最小値" type="number" min="0" max="99.9" step="0.1" value="30" disabled><span>%</span></div><label class="check"><input id="humidity-min-auto" type="checkbox" checked>湿度の最小値を自動で設定</label></div>
+          <div class="field"><label for="humidity-max">最大値</label><div class="number-with-unit"><input id="humidity-max" aria-label="湿度の最大値" type="number" min="0.1" max="100" step="0.1" value="80" disabled><span>%</span></div><label class="check"><input id="humidity-max-auto" type="checkbox" checked>湿度の最大値を自動で設定</label></div>
+        </div></fieldset><p class="field-hint">設定範囲から外れた値はグラフでは表示範囲外になりますが、記録・CSVには残ります。</p>
+      </div></section>
+      <section class="settings-section" aria-labelledby="display-title"><div class="settings-section-title"><p class="eyebrow">02 / DISPLAY</p><h2 id="display-title">開いたときの表示</h2><p>閲覧中の期間や表示項目は、グラフ画面で一時的に切り替えることもできます。</p></div><div class="settings-section-body">
+        <div class="form-grid"><div class="field"><label for="defaultPeriodHours">既定の表示期間</label><select id="defaultPeriodHours"><option value="1">1時間</option><option value="6">6時間</option><option value="24">24時間</option><option value="168">7日</option><option value="720">30日</option><option value="2160">90日</option></select></div><div class="field"><label for="defaultMetric">既定の表示項目</label><select id="defaultMetric"><option value="temperature">温度</option><option value="humidity">湿度</option></select></div></div>
+        <fieldset class="sensor-preferences"><legend>既定でグラフに表示するセンサー</legend><div id="settings-sensors" class="settings-sensors">センサーを読み込んでいます。</div><p class="field-hint">すべて選択すると、今後追加されたセンサーも自動で表示されます。</p></fieldset>
+        <div class="toggle-grid"><label class="check"><input id="showCards" type="checkbox" checked>センサーの現在値カードを表示</label><label class="check"><input id="showSummary" type="checkbox" checked>期間のまとめを表示</label><label class="check"><input id="showReadings" type="checkbox" checked>値を確認する表を表示</label><label class="check"><input id="showPoints" type="checkbox">取得した各ポイントを表示</label></div>
+      </div></section>
+      <section class="settings-section" aria-labelledby="behavior-title"><div class="settings-section-title"><p class="eyebrow">03 / BEHAVIOR</p><h2 id="behavior-title">更新とグラフの見え方</h2><p>表示の更新間隔と、取得の空白の扱いを調整できます。</p></div><div class="settings-section-body"><div class="form-grid">
+        <div class="field"><label for="refreshSeconds">画面の更新間隔</label><select id="refreshSeconds"><option value="15">15秒</option><option value="30">30秒</option><option value="60">60秒</option><option value="120">2分</option><option value="300">5分</option></select><p class="field-hint">センサーのAPI取得は約2分間隔です。</p></div>
+        <div class="field"><label for="staleMinutes">更新遅延と表示するまでの時間（分）</label><input id="staleMinutes" type="number" min="3" max="60" step="1" value="5"></div>
+        <div class="field"><label for="gapMinutes">線をつながない取得の空白（分）</label><input id="gapMinutes" type="number" min="2" max="120" step="1" value="20"></div>
+        <div class="field"><label for="lineWidth">グラフの線の太さ</label><select id="lineWidth"><option value="1">細い</option><option value="2">標準</option><option value="3">太い</option><option value="4">とても太い</option></select></div>
+      </div></div></section>
+      <div class="settings-actions"><div><button id="reset-settings" class="secondary-button" type="button">標準設定に戻す</button><button id="reload-settings" class="text-button" type="button">共有設定を再読込</button></div><div><button id="preview-settings" class="secondary-button" type="button">変更をプレビュー ↗</button><button id="save-settings" class="primary-button" type="submit" disabled>共有設定を保存</button></div><p>保存後、通常は次の収集・公開で反映されます。開いているページも更新時に設定を読み直します。</p></div>
+    </form>
+    <details class="settings-help"><summary>共有設定の保存と管理者認証について</summary><p>設定の閲覧とプレビューは誰でも利用できます。保存には、このリポジトリへ書き込みできるGitHubアカウントの認証が必要です。認証情報は保存する際にGitHubへ直接送信し、このサイトの保存データには含めません。</p><p>設定を直接編集する場合は、<a href="https://github.com/nbbbnbbb/switchbot-climate/edit/main/docs/settings.json" target="_blank" rel="noopener noreferrer">GitHubの設定ファイル</a>からも変更できます。</p></details>
+    <footer><span>Climate Log / 共有設定</span><span>設定は全閲覧者に適用・センサーの記録は継続</span></footer>
+  </main>
+  <dialog id="admin-dialog" aria-labelledby="admin-title"><form id="admin-form"><div class="dialog-heading"><div><p class="eyebrow">ADMIN ACCESS</p><h2 id="admin-title">共有設定を保存</h2></div><button id="close-admin" type="button" class="icon-button" aria-label="認証画面を閉じる">×</button></div><p>GitHubの書き込み権限で認証します。この設定は、すべての閲覧者の表示に適用されます。</p><label for="admin-token">GitHubアクセストークン</label><input id="admin-token" type="password" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" required placeholder="github_pat_…"><p class="field-hint">トークンはこの保存処理にだけ使い、ブラウザーや公開ファイルには保存しません。SwitchBotのToken・Secretとは別です。</p><details><summary>GitHubトークンの準備方法</summary><ol><li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">GitHubでFine-grained tokenを作成</a></li><li>Repository accessで「Only select repositories」を選び、<strong>switchbot-climate</strong>だけを指定</li><li>Repository permissionsの<strong>Contents → Read and write</strong>を指定</li><li>作成したトークンをこの入力欄へ貼り付け</li></ol><p>必要な権限はこのリポジトリのContentsだけです。</p></details><div id="admin-error" class="form-error" role="alert" hidden></div><button id="confirm-save" class="primary-button" type="submit">認証して全員に保存</button></form></dialog>
+  <script type="module" src="./settings-page.mjs?v=2"></script>
+</body></html>

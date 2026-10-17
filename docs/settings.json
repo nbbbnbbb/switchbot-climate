@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "axes": {"temperature": {"min": null, "max": null}, "humidity": {"min": null, "max": null}},
+  "defaultPeriodHours": 24,
+  "defaultMetric": "temperature",
+  "visibleSensorIds": null,
+  "refreshSeconds": 60,
+  "gapMinutes": 20,
+  "staleMinutes": 5,
+  "showPoints": false,
+  "showCards": true,
+  "showSummary": true,
+  "showReadings": true,
+  "lineWidth": 2
+}

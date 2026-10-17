@@ -3,7 +3,7 @@ name: Collect and publish climate
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/data/**', 'README.md']
+    paths-ignore: ['docs/data/**', 'docs/settings.json', 'README.md']
   schedule:
     - cron: '2-59/10 * * * *'
   workflow_dispatch:
@@ -54,7 +54,7 @@ jobs:
         if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
         run: |
           python3 -m unittest discover -s tests -v
-          node --test tests/chart.test.mjs
+          node --test tests/*.test.mjs
       - name: Configure Pages
         if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
         uses: actions/configure-pages@v5

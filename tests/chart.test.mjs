@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {pointsFor, stats, segments, csvCell, isStale} from '../docs/chart.mjs';
+import {pointsFor, stats, segments, csvCell, isStale, pickPoint} from '../docs/chart.mjs';
+test('pointing at one line only selects the nearby sensor',()=>{
+  const series=[{id:'a',points:[{at:0,value:20},{at:100,value:20}]},{id:'b',points:[{at:0,value:50},{at:100,value:50}]}];
+  const chosen=pickPoint(series,60,{x:60,y:49},x=>x,y=>y);
+  assert.equal(chosen.series.id,'b');assert.equal(chosen.point.value,50);
+  assert.equal(pickPoint(series,60,{x:60,y:100},x=>x,y=>y),null);
+});
+test('hover never invents a segment through missing collection data',()=>{
+  const series=[{id:'a',points:[{at:0,value:20},{at:10000,value:30}]}];
+  assert.equal(pickPoint(series,5000,{x:50,y:25},x=>x/100,y=>y,{maxGap:100,maxDistance:5}),null);
+});
+test('hover reports a real reading rather than an interpolated temperature',()=>{
+  const series=[{id:'a',points:[{at:0,value:20},{at:100,value:30}]}];
+  const chosen=pickPoint(series,75,{x:75,y:27.5},x=>x,y=>y);assert.equal(chosen.point.value,30);assert.equal(chosen.point.at,100);
+});
 test('stalled collection is marked stale after five minutes',()=>{
   const now=Date.parse('2026-10-17T02:00:00Z');
   assert.equal(isStale('2026-10-17T01:58:00Z',now),false);
