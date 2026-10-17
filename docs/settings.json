@@ -1,10 +1,26 @@
 {
   "schemaVersion": 1,
-  "axes": {"temperature": {"min": null, "max": null}, "humidity": {"min": null, "max": null}},
+  "axes": {
+    "temperature": {
+      "min": 15,
+      "max": 30
+    },
+    "humidity": {
+      "min": 30,
+      "max": 80
+    }
+  },
   "defaultPeriodHours": 24,
   "defaultMetric": "temperature",
-  "visibleSensorIds": null,
-  "refreshSeconds": 60,
+  "visibleSensorIds": [
+    "sensor-0360eb0d6e51",
+    "sensor-2841a651b49b",
+    "sensor-340389ae8d7a",
+    "sensor-366fdb19e85c",
+    "sensor-b2bbde86cfef",
+    "sensor-d801c41f42cd"
+  ],
+  "refreshSeconds": 30,
   "gapMinutes": 20,
   "staleMinutes": 5,
   "showPoints": false,
