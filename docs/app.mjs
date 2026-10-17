@@ -1,7 +1,7 @@
-import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=2';
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=2';
-import {readSharedSettings} from './settings-store.mjs?v=2';
-import {renderChart} from './graph.mjs?v=2';
+import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=3';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=3';
+import {readSharedSettings} from './settings-store.mjs?v=3';
+import {renderChart} from './graph.mjs?v=3';
 const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});

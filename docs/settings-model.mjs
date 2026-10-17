@@ -46,5 +46,6 @@ export function axisDomain(values,metric,bounds={min:null,max:null}) {
   let min=bounds.min??Math.floor(low-pad),max=bounds.max??Math.ceil(high+pad);
   if(metric==='humidity'){if(bounds.min===null||bounds.min===undefined)min=Math.max(0,min);if(bounds.max===null||bounds.max===undefined)max=Math.min(100,max);}
   if(min>=max){if(bounds.max===null||bounds.max===undefined)max=min+(metric==='temperature'?2:5);else min=max-(metric==='temperature'?2:5);}
+  if(metric==='humidity'){min=Math.max(0,min);max=Math.min(100,max);}
   return {min,max};
 }

@@ -1,5 +1,5 @@
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=2';
-import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=2';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=3';
+import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=3';
 const $=id=>document.getElementById(id);
 let sensors=[],expectedSha=null,loaded=false,dirty=false,saving=false,pending=null;
 function message(value,error=false){$('settings-message').textContent=value;$('settings-message').classList.toggle('error',error);$('settings-message').hidden=!value;}

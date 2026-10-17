@@ -5,6 +5,8 @@ import {saveSharedSettings,readRepositorySettings} from '../docs/settings-store.
 test('shared bounds support automatic, fixed and independent min/max',()=>{
   assert.deepEqual(axisDomain([20,22],'temperature',{min:10,max:30}),{min:10,max:30});
   assert.deepEqual(axisDomain([20,22],'temperature',{min:10,max:null}),{min:10,max:23});
+  assert.deepEqual(axisDomain([50],'humidity',{min:null,max:0.1}),{min:0,max:0.1});
+  assert.deepEqual(axisDomain([50],'humidity',{min:99.9,max:null}),{min:99.9,max:100});
   const automatic=axisDomain([20,22],'temperature');assert.ok(automatic.min<20&&automatic.max>22);
   const changed=normalizeSettings({axes:{temperature:{min:15,max:25}}});assert.equal(changed.axes.humidity.min,null);
 });
