@@ -1,12 +1,14 @@
-import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=3';
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=3';
-import {readSharedSettings} from './settings-store.mjs?v=3';
-import {renderChart} from './graph.mjs?v=3';
+import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=4';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=4';
+import {readSharedSettings} from './settings-store.mjs?v=4';
+import {HeatmapViewer} from './heatmap.mjs?v=4';
+import {renderChart} from './graph.mjs?v=4';
 const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
 let sensors=[],rows=[],status={},days=1,metric='temperature',demo=false,busy=false,loadedAt=Date.now();
 const hidden=new Set();
+const heatmap=new HeatmapViewer();
 let settings=normalizeSettings(DEFAULT_SETTINGS),settingsApplied=false,refreshTimer=null;
 let previewSettings=null;
 try{const raw=new URLSearchParams(location.search).get('preview');if(raw)previewSettings=normalizeSettings(JSON.parse(raw));}catch{}
@@ -14,13 +16,13 @@ function applySettings(next){
   const old=settings,initial=!settingsApplied;
   settings=next;settingsApplied=true;
   if(initial||old.defaultPeriodHours!==next.defaultPeriodHours)days=next.defaultPeriodHours/24;
-  if(initial||old.defaultMetric!==next.defaultMetric)metric=next.defaultMetric;
+  if(initial||old.defaultMetric!==next.defaultMetric){metric=next.defaultMetric;heatmap.metric=metric;document.querySelectorAll('[data-heat-metric]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.heatMetric===metric)));$('heat-visual').setAttribute('aria-labelledby','heat-'+metric+'-tab');}
   if(initial||JSON.stringify(old.visibleSensorIds)!==JSON.stringify(next.visibleSensorIds)){
     hidden.clear();if(next.visibleSensorIds)for(const sensor of sensors)if(!next.visibleSensorIds.includes(sensor.id))hidden.add(sensor.id);
   }
   if(initial||old.refreshSeconds!==next.refreshSeconds){clearInterval(refreshTimer);refreshTimer=setInterval(()=>{if(!document.hidden&&!demo)load();},next.refreshSeconds*1000);}
   document.querySelectorAll('[data-days]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.days)===days)));
-  document.querySelectorAll('[data-metric]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.metric===metric)));
+
   $('sensor-cards').hidden=!settings.showCards;$('summary-section').hidden=!settings.showSummary;$('readings-section').hidden=!settings.showReadings;
   $('cadence-label').textContent='約2分ごとに収集・公開／画面は'+settings.refreshSeconds+'秒ごとに再読込';
   $('gap-label').textContent=settings.gapMinutes+'分を超える取得の空白は線をつなぎません。';
@@ -69,14 +71,21 @@ function render(){
 }
 function selectedRows(){return rows.filter(r=>Date.parse(r.at)>=loadedAt-days*86400000);}
 function draw(){
-  const start=loadedAt-days*86400000,end=loadedAt,unit=metric==='temperature'?'°C':'%';
+  const start=loadedAt-days*86400000,end=loadedAt;
   $('range-label').textContent=date.format(start)+' – '+date.format(end);
-  const series=sensors.map((s,i)=>({...s,color:COLORS[i%COLORS.length],points:pointsFor(rows,s.id,metric,start)})).filter(s=>!hidden.has(s.id));
-  const has=renderChart({chart:$('chart'),tooltip:$('tooltip'),empty:$('chart-empty'),series,start,end,metric,settings,demo});
+  heatmap.update({sensors,rows,settings,start,end,demo});
+  let has=false;
+  for(const metric of ['temperature','humidity']){
+    const series=sensors.map((s,i)=>({...s,color:COLORS[i%COLORS.length],points:pointsFor(rows,s.id,metric,start)})).filter(s=>!hidden.has(s.id));
+    has=renderChart({chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo})||has;
+  }
   $('summary').replaceChildren();
-  for(const s of series){const row=el('tr'),summary=stats(s.points);row.append(el('td',s.name));for(const key of ['min','average','max'])row.append(el('td',summary?summary[key].toFixed(1)+' '+unit:'—'));row.append(el('td',String(s.points.length)));$('summary').append(row);}
-  if(!series.length){const row=el('tr'),cell=el('td',sensors.length?'表示するセンサーを選択してください':'記録待ち');cell.colSpan=5;row.append(cell);$('summary').append(row);}
-  const visible=new Set(series.map(s=>s.id)),names=new Map(sensors.map(s=>[s.id,s.name]));let count=0;$('readings').replaceChildren();
+  for(const s of sensors.filter(s=>!hidden.has(s.id))){
+    const row=el('tr');row.append(el('td',s.name));
+    for(const metric of ['temperature','humidity']){const summary=stats(pointsFor(rows,s.id,metric,start));for(const key of ['min','average','max'])row.append(el('td',summary?summary[key].toFixed(1):'—'));}
+    $('summary').append(row);
+  }
+  const visible=new Set(sensors.filter(s=>!hidden.has(s.id)).map(s=>s.id)),names=new Map(sensors.map(s=>[s.id,s.name]));let count=0;$('readings').replaceChildren();
   for(const row of [...selectedRows()].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at))){for(const[id,v]of Object.entries(row.values)){if(!visible.has(id)||count>=100)continue;const tr=el('tr');tr.append(el('td',date.format(Date.parse(row.at))),el('td',names.get(id)||id),el('td',v.temperature),el('td',v.humidity));$('readings').append(tr);count++;}if(count>=100)break;}
   $('csv').disabled=!has;
 }
@@ -89,7 +98,7 @@ function sample(){
 }
 $('refresh').addEventListener('click',()=>demo?render():load());$('demo-toggle').addEventListener('click',sample);
 document.querySelectorAll('[data-days]').forEach(button=>button.addEventListener('click',()=>{days=Number(button.dataset.days);document.querySelectorAll('[data-days]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));demo?draw():load();}));
-document.querySelectorAll('[data-metric]').forEach(button=>button.addEventListener('click',()=>{metric=button.dataset.metric;document.querySelectorAll('[data-metric]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));draw();}));
+
 $('csv').addEventListener('click',()=>{const names=new Map(sensors.map(s=>[s.id,s.name]));const records=[['取得日時（UTC）','センサー','温度（°C）','湿度（%）','データ種別']];for(const row of selectedRows())for(const [id,v]of Object.entries(row.values))if(!hidden.has(id))records.push([row.at,names.get(id)||id,v.temperature,v.humidity,demo?'サンプル':'API取得値']);const blob=new Blob(['\ufeff'+records.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=(demo?'sample-':'')+'climate-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 load();
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(draw,150);});

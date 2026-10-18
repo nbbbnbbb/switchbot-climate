@@ -1,10 +1,14 @@
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=3';
-import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=3';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=4';
+import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=4';
+import {PositionEditor} from './position-editor.mjs?v=4';
 const $=id=>document.getElementById(id);
+const positionEditor=new PositionEditor();
 let sensors=[],expectedSha=null,loaded=false,dirty=false,saving=false,pending=null;
 function message(value,error=false){$('settings-message').textContent=value;$('settings-message').classList.toggle('error',error);$('settings-message').hidden=!value;}
 function fill(input){
   const settings=normalizeSettings(input);
+  positionEditor.set(settings,sensors);
+  fillHeatmap(settings.heatmap);
   for(const metric of ['temperature','humidity'])for(const side of ['min','max']){
     const value=settings.axes[metric][side],id=metric+'-'+side;
     $(id+'-auto').checked=value===null;$(id).disabled=value===null;
@@ -28,8 +32,36 @@ function formSettings(){
   for(const key of ['showCards','showSummary','showReadings','showPoints'])input[key]=$(key).checked;
   const selected=[...document.querySelectorAll('[data-sensor]:checked')].map(e=>e.dataset.sensor);
   input.visibleSensorIds=selected.length===sensors.length?null:selected;
+  Object.assign(input,positionEditor.read());
+  input.heatmap=readHeatmap();
   return normalizeSettings(input);
 }
+function colorPreview(metric){
+  const low=$('heat-'+metric+'-low').value,mid=$('heat-'+metric+'-mid').value,high=$('heat-'+metric+'-high').value,at=Number($('heat-'+metric+'-midpoint').value);
+  $('heat-'+metric+'-preview').style.background=`linear-gradient(90deg,${low},${mid} ${at}%,${high})`;
+}
+function fillHeatmap(heatmap){
+  for(const metric of ['temperature','humidity']){
+    for(const side of ['min','max']){const id='heat-'+metric+'-'+side,v=heatmap.axes[metric][side];$(id+'-auto').checked=v===null;$(id).disabled=v===null;if(v!==null)$(id).value=v;}
+    for(const key of ['low','mid','high'])$('heat-'+metric+'-'+key).value=heatmap.colors[metric][key];
+    $('heat-'+metric+'-midpoint').value=Math.round(heatmap.colors[metric].midpoint*100);colorPreview(metric);
+  }
+  $('heat-power').value=heatmap.power;$('heat-maxAge').value=heatmap.maxAgeMinutes;$('heat-showLabels').checked=heatmap.showLabels;
+}
+function readHeatmap(){
+  const h={axes:{},colors:{},power:Number($('heat-power').value),maxAgeMinutes:$('heat-maxAge').value.trim()===''?NaN:Number($('heat-maxAge').value),showLabels:$('heat-showLabels').checked};
+  for(const metric of ['temperature','humidity']){
+    h.axes[metric]={};for(const side of ['min','max']){const id='heat-'+metric+'-'+side;h.axes[metric][side]=$(id+'-auto').checked?null:$(id).value.trim()===''?NaN:Number($(id).value);}
+    h.colors[metric]={};for(const key of ['low','mid','high'])h.colors[metric][key]=$('heat-'+metric+'-'+key).value;
+    h.colors[metric].midpoint=Number($('heat-'+metric+'-midpoint').value)/100;
+  }
+  return h;
+}
+for(const metric of ['temperature','humidity']){
+  for(const side of ['min','max']){const id='heat-'+metric+'-'+side;$(id+'-auto').addEventListener('change',()=>{$(id).disabled=$(id+'-auto').checked;});}
+  for(const key of ['low','mid','high','midpoint'])$('heat-'+metric+'-'+key).addEventListener('input',()=>colorPreview(metric));
+}
+document.querySelectorAll('[data-reverse-colors]').forEach(b=>b.addEventListener('click',()=>{const metric=b.dataset.reverseColors,low=$('heat-'+metric+'-low'),high=$('heat-'+metric+'-high'),old=low.value;low.value=high.value;high.value=old;colorPreview(metric);low.dispatchEvent(new Event('input',{bubbles:true}));}));
 async function load(){
   $('reload-settings').disabled=true;
   try{
