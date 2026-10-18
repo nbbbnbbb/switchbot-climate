@@ -1,8 +1,8 @@
-import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=4';
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=4';
-import {readSharedSettings} from './settings-store.mjs?v=4';
-import {HeatmapViewer} from './heatmap.mjs?v=4';
-import {renderChart} from './graph.mjs?v=4';
+import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=5';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=5';
+import {readSharedSettings} from './settings-store.mjs?v=5';
+import {HeatmapViewer} from './heatmap.mjs?v=5';
+import {renderChart} from './graph.mjs?v=5';
 const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});

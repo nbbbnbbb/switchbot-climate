@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DEFAULT_SETTINGS,normalizeSettings} from '../docs/settings-model.mjs';
-import {insideRoom,makeIndex,readingAt,frameSensors,interpolate,colorAt,triangleMesh,wallMesh} from '../docs/spatial.mjs';
+import {insideRoom,makeIndex,readingAt,frameSensors,interpolate,colorAt,triangleMesh,wallMesh,planBounds,orthographicProjection} from '../docs/spatial.mjs';
 const room={width:4,depth:3,height:2.4,apexX:1};
 test('triangular floor with vertical extrusion includes its boundaries, excludes box corners and outside height',()=>{
  for(const p of [{x:0,y:0,z:0},{x:4,y:0,z:2.4},{x:1,y:3,z:1},{x:1.5,y:1,z:1}])assert.equal(insideRoom(p,room),true);
@@ -46,4 +46,10 @@ test('old shared settings migrate without inventing sensor positions or changing
 test('invalid geometry, position coordinates and color settings cannot be shared',()=>{
  for(const config of [{room:{width:0}},{room:{apexX:3}},{sensorPositions:{'sensor-a':{x:NaN,y:0,z:1}}},{sensorPositions:{'sensor-a':{x:1,y:0,z:1,enabled:'yes'}}},{heatmap:{axes:{humidity:{min:50,max:40}}}},{heatmap:{colors:{temperature:{low:'red'}}}},{heatmap:{colors:{temperature:{midpoint:1}}}},{heatmap:{maxAgeMinutes:0}},{heatmap:{power:Infinity}}])assert.throws(()=>normalizeSettings(config));
  const settings=normalizeSettings({sensorPositions:{'sensor-a':{x:1,y:0,z:1,token:'secret'}},heatmap:{token:'secret'}});assert.equal(JSON.stringify(settings).includes('secret'),false);
+});
+
+test('orthographic plan and elevation share an equal unit scale and common horizontal coordinates',()=>{
+ const b=planBounds(room,[{x:6,y:-1,z:1}]),plan=orthographicProjection('plan',b),front=orthographicProjection('front',b);
+ assert.equal(plan.scale,front.scale);assert.equal(plan.left,front.left);
+ for(const p of [plan,front]){assert.ok((b.x1-b.x0)*p.scale<=540);assert.ok((p.range[1]-p.range[0])*p.scale<=255);}
 });

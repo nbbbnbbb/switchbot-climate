@@ -60,3 +60,9 @@ export function planBounds(room,positions=[]){
   for(const p of positions){x0=Math.min(x0,p.x-room.width*.1);x1=Math.max(x1,p.x+room.width*.1);y0=Math.min(y0,p.y-room.depth*.1);y1=Math.max(y1,p.y+room.depth*.1);z0=Math.min(z0,p.z-room.height*.1);z1=Math.max(z1,p.z+room.height*.1);}
   return{x0,x1,y0,y1,z0,z1};
 }
+
+export function orthographicProjection(view,b){
+  const range=view==='plan'?[b.y0,b.y1]:[b.z0,b.z1];
+  const scale=Math.min(540/(b.x1-b.x0),255/Math.max(b.y1-b.y0,b.z1-b.z0));
+  return{range,scale,left:50+(540-(b.x1-b.x0)*scale)/2,top:35+(255-(range[1]-range[0])*scale)/2};
+}

@@ -1,4 +1,4 @@
-import {normalizeSettings} from './settings-model.mjs?v=4';
+import {normalizeSettings} from './settings-model.mjs?v=5';
 export const REPOSITORY='nbbbnbbb/switchbot-climate';
 const ENDPOINT=`https://api.github.com/repos/${REPOSITORY}/contents/docs/settings.json`;
 export async function readSharedSettings(fetcher=fetch){

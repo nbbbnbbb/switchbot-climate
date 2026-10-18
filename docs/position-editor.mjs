@@ -1,4 +1,4 @@
-import {insideRoom,planBounds} from './spatial.mjs?v=4';
+import {insideRoom,planBounds,orthographicProjection} from './spatial.mjs?v=5';
 const $=id=>document.getElementById(id);
 const svg=(tag,attrs={},label)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(label!==undefined)e.textContent=label;return e;};
 export class PositionEditor{
@@ -32,18 +32,21 @@ export class PositionEditor{
     for(const key of ['width','depth','height','apexX'])$('room-'+key).value=this.room[key];$('room-confirmed').checked=this.room.dimensionsConfirmed;
     $('placement-sensor').replaceChildren();for(const s of sensors){const option=document.createElement('option');option.value=s.id;option.textContent=s.name;$('placement-sensor').append(option);}$('placement-sensor').value=this.selected??'';this.fields();this.draw();
   }
-  ensure(){if(!this.positions[this.selected])this.positions[this.selected]={x:(this.room.width+this.room.apexX)/3,y:this.room.depth/3,z:this.room.height/2,enabled:true};}
+  ensure(){if(!this.positions[this.selected])this.positions[this.selected]={x:Math.round((this.room.width+this.room.apexX)/3*100)/100,y:Math.round(this.room.depth/3*100)/100,z:this.room.height/2,enabled:true};}
   fields(){const p=this.positions[this.selected];$('position-placed').checked=Boolean(p);$('position-enabled').checked=p?.enabled??true;$('position-enabled').disabled=!p;
     for(const key of ['x','y','z']){$('position-'+key).disabled=!p;$('position-'+key).value=p?p[key]:'';}
   }
   changed(){$('placement-sensor').dispatchEvent(new Event('input',{bubbles:true}));}
-  move(event,view){const box=$('placement-'+view).getBoundingClientRect(),b=this.drag.bounds,x=(event.clientX-box.left)/box.width*620,y=(event.clientY-box.top)/box.height*340;
-    const range=view==='plan'?[b.y0,b.y1]:[b.z0,b.z1];this.ensure();const p=this.positions[this.selected];p.x=Math.max(-100,Math.min(200,Math.round((b.x0+(x-50)/540*(b.x1-b.x0))*100)/100));p[view==='plan'?'y':'z']=Math.max(-100,Math.min(200,Math.round((range[0]+(290-y)/255*(range[1]-range[0]))*100)/100));this.fields();this.changed();this.draw();
+  projection(view,b){return orthographicProjection(view,b);}
+  move(event,view){
+    const chart=$('placement-'+view),matrix=chart.getScreenCTM();if(!matrix)return;
+    const pointer=chart.createSVGPoint();pointer.x=event.clientX;pointer.y=event.clientY;const cursor=pointer.matrixTransform(matrix.inverse()),b=this.drag.bounds,{range,scale,left,top}=this.projection(view,b);
+    this.ensure();const p=this.positions[this.selected];p.x=Math.max(-100,Math.min(200,Math.round((b.x0+(cursor.x-left)/scale)*100)/100));p[view==='plan'?'y':'z']=Math.max(-100,Math.min(200,Math.round((range[1]-(cursor.y-top)/scale)*100)/100));this.fields();this.changed();this.draw();
   }
   draw(){
     const r=this.room,b=this.drag?.bounds??planBounds(r,Object.values(this.positions));
     for(const view of ['plan','front']){
-      const chart=$('placement-'+view),range=view==='plan'?[b.y0,b.y1]:[b.z0,b.z1],x=v=>50+(v-b.x0)/(b.x1-b.x0)*540,y=v=>290-(v-range[0])/(range[1]-range[0])*255;
+      const chart=$('placement-'+view),{range,scale,left,top}=this.projection(view,b),x=v=>left+(v-b.x0)*scale,y=v=>top+(range[1]-v)*scale;
       chart.replaceChildren(svg('title',{},view==='plan'?'平面図。XとYを設定。':'正面図。Xと高さZを設定。'));
       chart.append(svg('rect',{x:0,y:0,width:620,height:340,fill:'#f6f9fc'}));
       for(let i=0;i<=4;i++){const xv=b.x0+(b.x1-b.x0)*i/4,yv=range[0]+(range[1]-range[0])*i/4;chart.append(svg('line',{x1:x(xv),x2:x(xv),y1:35,y2:290,stroke:'#e1e9f0'}),svg('text',{x:x(xv),y:313,'text-anchor':'middle',fill:'#778b9e','font-size':12},xv.toFixed(1)),svg('line',{x1:50,x2:590,y1:y(yv),y2:y(yv),stroke:'#e1e9f0'}),svg('text',{x:42,y:y(yv)+4,'text-anchor':'end',fill:'#778b9e','font-size':12},yv.toFixed(1)));}

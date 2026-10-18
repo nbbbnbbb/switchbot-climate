@@ -1,6 +1,6 @@
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=4';
-import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=4';
-import {PositionEditor} from './position-editor.mjs?v=4';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=5';
+import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=5';
+import {PositionEditor} from './position-editor.mjs?v=5';
 const $=id=>document.getElementById(id);
 const positionEditor=new PositionEditor();
 let sensors=[],expectedSha=null,loaded=false,dirty=false,saving=false,pending=null;

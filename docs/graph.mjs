@@ -1,5 +1,5 @@
-import {segments,pickPoint} from './chart.mjs?v=4';
-import {axisDomain} from './settings-model.mjs?v=4';
+import {segments,pickPoint} from './chart.mjs?v=5';
+import {axisDomain} from './settings-model.mjs?v=5';
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
 const svg=(tag,attrs,text)=>{const n=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
