@@ -29,6 +29,10 @@ runs:
       env:
         SAMPLE_SLOT: ${{ inputs.slot }}
       run: python3 scripts/wait_for_slot.py "$SAMPLE_SLOT"
+    - name: Sync latest source and history
+      if: steps.timing.outputs.due == 'true'
+      shell: bash
+      run: git pull --ff-only origin main
     - name: Collect readings
       id: collect
       if: steps.timing.outputs.due == 'true' && inputs.configured == 'true'
