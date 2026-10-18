@@ -1,4 +1,4 @@
-import {segments,pickPoint} from './chart.mjs?v=5';
+import {segments,pickPoint,timeTicks} from './chart.mjs?v=6';
 import {axisDomain} from './settings-model.mjs?v=5';
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
@@ -17,7 +17,15 @@ export function renderChart({chart,tooltip,empty,series,start,end,metric,setting
   const clipId=chart.id+'-clip';const defs=svg('defs',{}),clip=svg('clipPath',{id:clipId});clip.append(svg('rect',{x:left,y:top,width:right-left,height:bottom-top}));defs.append(clip);chart.append(defs);
   for(let i=0;i<=5;i++){const v=min+(max-min)*i/5,Y=y(v);chart.append(svg('line',{x1:left,x2:right,y1:Y,y2:Y,class:'grid'}),svg('text',{x:left-10,y:Y+4,'text-anchor':'end'},v.toFixed(1)));}
   chart.append(svg('text',{x:10,y:14},unit));
-  const ticks=width<600?2:4;for(let i=0;i<=ticks;i++){const t=start+(end-start)*i/ticks;chart.append(svg('text',{x:x(t),y:308,'text-anchor':i===0?'start':i===ticks?'end':'middle'},end-start<=86400000?clock.format(t):date.format(t)));}
+  const ticks=timeTicks(start,end,right-left),density=Math.min(1,(right-left)/Math.max(1,ticks.length*4));
+  for(const tick of ticks){
+    const X=x(tick.at);
+    chart.append(svg('line',{x1:X,x2:X,y1:top,y2:bottom,class:'time-grid'+(tick.wholeHour?' whole-hour':' half-hour'),'data-at':new Date(tick.at).toISOString(),opacity:tick.wholeHour?density:density*.55}));
+    if(tick.label){
+      const edge=X-left<32?'start':right-X<32?'end':'middle';
+      chart.append(svg('text',{x:X,y:308,'text-anchor':edge,class:'time-tick','data-at':new Date(tick.at).toISOString()},end-start<=86400000?clock.format(tick.at):date.format(tick.at)));
+    }
+  }
   const plots=svg('g',{'clip-path':`url(#${clipId})`});chart.append(plots);
   for(const s of series)for(const group of segments(s.points,settings.gapMinutes*60000)){
     plots.append(svg('path',{d:group.map((p,i)=>(i?'L':'M')+x(p.at).toFixed(2)+','+y(p.value).toFixed(2)).join(' '),class:'series',stroke:s.color,'stroke-width':settings.lineWidth,style:`stroke-width:${settings.lineWidth}`}));

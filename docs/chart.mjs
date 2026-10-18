@@ -41,3 +41,16 @@ export function csvCell(value) {
   const text=String(value ?? '');
   return '"'+text.replace(/^[=+\-@\t\r]/,"'$&").replaceAll('"','""')+'"';
 }
+
+// Every grid line is anchored to a real :00 / :30 in Japan time.
+// Labels thin out with the visible span; grid timestamps remain half-hourly.
+export function timeTicks(start,end,pixels=600){
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return[];
+  const halfHour=1800000,hour=3600000,offset=9*hour,span=end-start;
+  const labelCount=Math.max(1,Math.floor(pixels/(span>86400000?105:65)));
+  const minimum=span/labelCount;
+  const labelStep=span<=2*hour&&minimum<=halfHour?halfHour:[1,2,3,6,12,24,48,72,168,336,720].map(h=>h*hour).find(step=>step>=minimum)??720*hour;
+  const ticks=[];
+  for(let at=Math.ceil(start/halfHour)*halfHour;at<=end;at+=halfHour)ticks.push({at,wholeHour:(at+offset)%hour===0,midnight:(at+offset)%86400000===0,label:(at+offset)%labelStep===0});
+  return ticks;
+}

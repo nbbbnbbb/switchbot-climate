@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {pointsFor, stats, segments, csvCell, isStale, pickPoint} from '../docs/chart.mjs';
+import {pointsFor, stats, segments, csvCell, isStale, pickPoint, timeTicks} from '../docs/chart.mjs';
 test('pointing at one line only selects the nearby sensor',()=>{
   const series=[{id:'a',points:[{at:0,value:20},{at:100,value:20}]},{id:'b',points:[{at:0,value:50},{at:100,value:50}]}];
   const chosen=pickPoint(series,60,{x:60,y:49},x=>x,y=>y);
@@ -36,4 +36,25 @@ test('statistics use actual acquired records',()=>{
 test('CSV escapes quotes and spreadsheet formulas',()=>{
   assert.equal(csvCell('a"b'),'"a""b"');
   assert.equal(csvCell('=HYPERLINK("bad")'),'"\'=HYPERLINK(""bad"")"');
+});
+
+test('time grid uses real half hours instead of offsets from the current minute',()=>{
+  const start=Date.parse('2026-10-18T09:07:13+09:00'),end=Date.parse('2026-10-18T10:07:13+09:00');
+  const ticks=timeTicks(start,end,450);
+  assert.deepEqual(ticks.map(t=>new Date(t.at).toISOString()),['2026-10-18T00:30:00.000Z','2026-10-18T01:00:00.000Z']);
+  assert.deepEqual(ticks.map(t=>t.wholeHour),[false,true]);assert.ok(ticks.every(t=>t.label));
+});
+test('half-hour grid remains identical on both metrics and labels thin at whole hours for wider spans',()=>{
+  const start=Date.parse('2026-10-18T09:07:00+09:00'),end=start+24*3600000;
+  const narrow=timeTicks(start,end,300),wide=timeTicks(start,end,1000);
+  assert.equal(narrow.length,48);assert.deepEqual(narrow.map(t=>t.at),wide.map(t=>t.at));
+  assert.ok(narrow.filter(t=>t.label).length<wide.filter(t=>t.label).length);
+  assert.ok(narrow.filter(t=>t.label).every(t=>t.wholeHour));
+  assert.ok(narrow.every(t=>t.at>=start&&t.at<=end&&t.at%1800000===0));
+});
+test('long-span date labels align to Japan midnight and half-hour grids are preserved',()=>{
+  const start=Date.parse('2026-10-18T09:07:00+09:00'),ticks=timeTicks(start,start+7*86400000,470);
+  assert.equal(ticks.length,336);assert.ok(ticks.filter(t=>t.label).length>0);
+  assert.ok(ticks.filter(t=>t.label).every(t=>t.midnight));
+  assert.deepEqual(timeTicks(NaN,start),[]);assert.deepEqual(timeTicks(start,start),[]);
 });

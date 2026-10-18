@@ -4,15 +4,13 @@ const fmt=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric'
 const $=id=>document.getElementById(id);
 export class HeatmapViewer{
   constructor(){
-    this.canvas=$('heatmap-canvas');this.ctx=this.canvas.getContext('2d');this.metric='temperature';this.follow=true;this.frames=[];this.yaw=.65;this.elevation=.45;this.zoom=1;this.slice=.5;this.mode='surface';this.timer=null;this.data=null;this.cache=null;
+    this.canvas=$('heatmap-canvas');this.ctx=this.canvas.getContext('2d');this.metric='temperature';this.follow=true;this.frames=[];this.yaw=.65;this.elevation=.45;this.zoom=1;this.timer=null;this.data=null;this.cache=null;
     document.querySelectorAll('[data-heat-metric]').forEach(b=>b.addEventListener('click',()=>{this.metric=b.dataset.heatMetric;document.querySelectorAll('[data-heat-metric]').forEach(t=>t.setAttribute('aria-selected',String(t===b)));this.updateFrame();}));
     $('heat-time').addEventListener('input',()=>{this.stop();this.follow=false;this.at=this.frames[Number($('heat-time').value)];this.updateFrame();});
     $('heat-latest').addEventListener('click',()=>{this.stop();this.follow=true;this.at=this.frames.at(-1);this.updateFrame();});
     for(const [id,delta]of [['heat-prev',-1],['heat-next',1]])$(id).addEventListener('click',()=>{this.stop();this.follow=false;const i=this.frameIndex();this.at=this.frames[Math.max(0,Math.min(this.frames.length-1,i+delta))];this.updateFrame();});
     $('heat-play').addEventListener('click',()=>{if(this.timer)this.stop();else this.play();});
     $('heat-speed').addEventListener('change',()=>{if(this.timer){this.stop();this.play();}});
-    $('heat-slice').addEventListener('input',()=>{this.slice=Number($('heat-slice').value)/100;this.draw();});
-    $('heat-mode').addEventListener('change',()=>{this.mode=$('heat-mode').value;this.draw();});
     $('heat-reset-view').addEventListener('click',()=>{this.yaw=.65;this.elevation=.45;this.zoom=1;this.draw();});
     $('heat-zoom-in').addEventListener('click',()=>{this.zoom=Math.min(3,this.zoom*1.2);this.draw();});
     $('heat-zoom-out').addEventListener('click',()=>{this.zoom=Math.max(.45,this.zoom/1.2);this.draw();});
@@ -76,15 +74,15 @@ export class HeatmapViewer{
     const all=[...vertices,...this.samples].map(raw),xs=all.map(p=>p.x),ys=all.map(p=>p.y),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),scale=Math.min((width-100)/Math.max(.1,x1-x0),(height-95)/Math.max(.1,y1-y0))*this.zoom;
     const project=p=>{const q=raw(p);return{x:width/2+(q.x-(x0+x1)/2)*scale,y:height/2+(q.y-(y0+y1)/2)*scale,depth:q.depth};};
     const path=points=>{ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();};
-    if(!this.cache||this.cache.slice!==this.slice||this.cache.mode!==this.mode){
+    if(!this.cache){
       const valid=this.samples.some(s=>s.inside&&s.enabled&&Number.isFinite(s.value));
-      const cells=valid?[...triangleMesh(r,this.slice*r.height,22).map(points=>({points,alpha:.96})),...(this.mode==='surface'?[...wallMesh(r,12),...triangleMesh(r,r.height,16),...triangleMesh(r,0,16)].map(points=>({points,alpha:.66})):[])]:[];
+      const cells=valid?[...wallMesh(r,12),...triangleMesh(r,r.height,16),...triangleMesh(r,0,16)].map(points=>({points,alpha:.66})):[];
       for(const cell of cells){const center=cell.points.reduce((a,p)=>({x:a.x+p.x/3,y:a.y+p.y/3,z:a.z+p.z/3}),{x:0,y:0,z:0});const value=interpolate(center,this.samples,settings.heatmap.power);cell.color=colorAt(value,this.domain.min,this.domain.max,settings.heatmap.colors[this.metric]);}
-      this.cache={slice:this.slice,mode:this.mode,cells};
+      this.cache={cells};
     }
     ctx.strokeStyle='#dbe5ee';ctx.lineWidth=1;
     const ground=planBounds(r);for(let i=0;i<=8;i++){const x=ground.x0+(ground.x1-ground.x0)*i/8,y=ground.y0+(ground.y1-ground.y0)*i/8;for(const pair of [[{x,y:ground.y0,z:0},{x,y:ground.y1,z:0}],[{x:ground.x0,y,z:0},{x:ground.x1,y,z:0}]]){const a=project(pair[0]),b=project(pair[1]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}}
-    // Painter's algorithm: 3D surface meshes and section are sorted by camera depth.
+    // Painter's algorithm: 3D surface meshes are sorted by camera depth.
     const objects=this.cache.cells.map(c=>({...c,projected:c.points.map(project)}));
     objects.sort((a,b)=>b.projected.reduce((v,p)=>v+p.depth,0)-a.projected.reduce((v,p)=>v+p.depth,0));
     for(const o of objects){path(o.projected);ctx.globalAlpha=o.alpha;ctx.fillStyle=o.color;ctx.fill();ctx.strokeStyle=o.color;ctx.lineWidth=.5;ctx.stroke();}ctx.globalAlpha=1;
@@ -101,7 +99,6 @@ export class HeatmapViewer{
       used.push({x,y,w});ctx.strokeStyle='#91a4b5';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(x+4,y+13);ctx.stroke();
       ctx.fillStyle='#ffffffed';ctx.fillRect(x,y,w,26);ctx.strokeStyle='#d3dfe9';ctx.strokeRect(x,y,w,26);ctx.fillStyle='#213d56';ctx.fillText(label,x+9,y+17);
     }
-    $('heat-height-label').textContent=(this.slice*r.height).toFixed(2)+' m';
     canvas.setAttribute('aria-label','三角柱状恒温室の'+(this.metric==='temperature'?'温度':'湿度')+'推定分布。'+$('heat-status').textContent+'。矢印キーで回転。実測値は下の一覧に表示。');
   }
 }
