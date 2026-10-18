@@ -23,6 +23,62 @@
   "refreshSeconds": 30,
   "gapMinutes": 20,
   "staleMinutes": 5,
+  "room": {
+    "width": 2,
+    "depth": 2,
+    "height": 2.4,
+    "apexX": 0,
+    "dimensionsConfirmed": false
+  },
+  "sensorPositions": {
+    "sensor-b8a1a0585a7f": {
+      "x": 1.55,
+      "y": 0.15,
+      "z": 1.2,
+      "enabled": true
+    },
+    "sensor-2841a651b49b": {
+      "x": 0.36,
+      "y": 1.24,
+      "z": 1.2,
+      "enabled": true
+    },
+    "sensor-340389ae8d7a": {
+      "x": 0.9,
+      "y": 0.26,
+      "z": 1.2,
+      "enabled": true
+    }
+  },
+  "heatmap": {
+    "axes": {
+      "temperature": {
+        "min": null,
+        "max": null
+      },
+      "humidity": {
+        "min": null,
+        "max": null
+      }
+    },
+    "colors": {
+      "temperature": {
+        "low": "#2563eb",
+        "mid": "#f2d264",
+        "high": "#df493e",
+        "midpoint": 0.5
+      },
+      "humidity": {
+        "low": "#f0dfb1",
+        "mid": "#54bcad",
+        "high": "#414b9c",
+        "midpoint": 0.5
+      }
+    },
+    "power": 2,
+    "maxAgeMinutes": 5,
+    "showLabels": true
+  },
   "showPoints": false,
   "showCards": true,
   "showSummary": true,
