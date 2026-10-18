@@ -1,13 +1,14 @@
-import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=5';
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=5';
-import {readSharedSettings} from './settings-store.mjs?v=5';
-import {HeatmapViewer} from './heatmap.mjs?v=6';
-import {renderChart} from './graph.mjs?v=6';
+import {PLUG_COLORS,plugPoints} from './plugs.mjs?v=7';
+import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=7';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=7';
+import {readSharedSettings} from './settings-store.mjs?v=7';
+import {HeatmapViewer} from './heatmap.mjs?v=7';
+import {renderChart} from './graph.mjs?v=7';
 const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
-let sensors=[],rows=[],status={},days=1,metric='temperature',demo=false,busy=false,loadedAt=Date.now();
-const hidden=new Set();
+let plugs=[],sensors=[],rows=[],status={},days=1,metric='temperature',demo=false,busy=false,loadedAt=Date.now();
+const hidden=new Set(),hiddenPlugs=new Set();
 const heatmap=new HeatmapViewer();
 let settings=normalizeSettings(DEFAULT_SETTINGS),settingsApplied=false,refreshTimer=null;
 let previewSettings=null;
@@ -20,6 +21,7 @@ function applySettings(next){
   if(initial||JSON.stringify(old.visibleSensorIds)!==JSON.stringify(next.visibleSensorIds)){
     hidden.clear();if(next.visibleSensorIds)for(const sensor of sensors)if(!next.visibleSensorIds.includes(sensor.id))hidden.add(sensor.id);
   }
+  if(initial||JSON.stringify(old.plugOverlay.visiblePlugIds)!==JSON.stringify(next.plugOverlay.visiblePlugIds)){hiddenPlugs.clear();if(next.plugOverlay.visiblePlugIds)for(const p of plugs)if(!next.plugOverlay.visiblePlugIds.includes(p.id))hiddenPlugs.add(p.id);}
   if(initial||old.refreshSeconds!==next.refreshSeconds){clearInterval(refreshTimer);refreshTimer=setInterval(()=>{if(!document.hidden&&!demo)load();},next.refreshSeconds*1000);}
   document.querySelectorAll('[data-days]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.days)===days)));
 
@@ -36,11 +38,11 @@ async function load(){
   if(busy||demo)return;busy=true;$('refresh').disabled=true;
   try{
     const [latest,state,manifest,shared]=await Promise.all([json('./data/latest.json'),json('./data/status.json'),json('./data/manifest.json'),readSharedSettings().catch(()=>null)]);
-    sensors=latest.sensors;applySettings(previewSettings||shared||settings);
+    sensors=latest.sensors.filter(s=>s.id!=='sensor-b8a1a0585a7f'&&!s.name.toUpperCase().includes('CO2'));plugs=latest.plugs??[];applySettings(previewSettings||shared||settings);
     const cutoff=new Date(Date.now()-days*86400000).toISOString().slice(0,7);
     const months=manifest.months.filter(m=>/^\d{4}-\d{2}$/.test(m)&&m>=cutoff);
     const results=await Promise.allSettled(months.map(m=>json('./data/history/'+m+'.json')));
-    sensors=latest.sensors;status=state;rows=results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);loadedAt=Date.now();
+    sensors=latest.sensors.filter(s=>s.id!=='sensor-b8a1a0585a7f'&&!s.name.toUpperCase().includes('CO2'));status=state;rows=results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);loadedAt=Date.now();
     const partial=results.some(r=>r.status==='rejected');
     notify(previewSettings?'設定プレビュー：この表示はまだ共有保存されていません。':partial?'一部の履歴を読み込めませんでした。しばらくしてから更新してください。':!shared?'共有設定を読み込めませんでした。前回の設定で表示しています。':state.message||'');
     render();
@@ -63,10 +65,18 @@ function render(){
     const title=el('h2',undefined,'sensor-name');title.append(el('i'),document.createTextNode(s.name));card.append(title);
     const values=el('div',undefined,'card-values');
     for(const [key,label,unit]of [['temperature','温度','°C'],['humidity','湿度','%']]){const box=el('div');box.append(el('small',label));const number=el('div',finite(s[key])?s[key].toFixed(key==='temperature'?1:0):'—','value');number.append(el('span',unit));box.append(number);values.append(box);}card.append(values);
+    if(s.message)card.append(el('p',s.message,'field-hint'));
     const outdated=s.state!=='ok'||isStale(s.collectedAt,Date.now(),settings.staleMinutes);
     card.append(el('p',(demo?'サンプル · ':outdated?'最終取得値 · ':'取得 ')+(s.collectedAt?date.format(Date.parse(s.collectedAt)):'未取得'),'card-time'+(outdated?' stale':'')));
     $('sensor-cards').append(card);
   });
+  plugs.forEach((p,i)=>{
+    const card=el('article',undefined,'sensor-card plug-card');card.style.setProperty('--sensor',PLUG_COLORS[i%PLUG_COLORS.length]);
+    const title=el('h2',undefined,'sensor-name');title.append(el('i'),document.createTextNode(p.name));card.append(title);
+    const values=el('div',undefined,'card-values');const state=el('div');state.append(el('small','電源状態'),el('div',p.power==='on'?'ON':p.power==='off'?'OFF':'—','value'));const watts=el('div');watts.append(el('small','消費電力'));const number=el('div',finite(p.powerWatts)?p.powerWatts.toFixed(1):'—','value');number.append(el('span','W'));watts.append(number);values.append(state,watts);card.append(values);
+    const stale=p.state!=='ok'||isStale(p.collectedAt,Date.now(),settings.staleMinutes);card.append(el('p',(stale?'最終取得値 · ':'取得 ')+(p.collectedAt?date.format(Date.parse(p.collectedAt)):'未取得'),'card-time'+(stale?' stale':'')));$('sensor-cards').append(card);
+  });
+  $('plug-legend').replaceChildren();plugs.forEach((p,i)=>{const label=el('label');label.style.setProperty('--sensor',PLUG_COLORS[i%PLUG_COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hiddenPlugs.has(p.id);input.addEventListener('change',()=>{input.checked?hiddenPlugs.delete(p.id):hiddenPlugs.add(p.id);draw();});label.append(input,document.createTextNode((i+1)+'. '+p.name+'（W・ON/OFF）'));$('plug-legend').append(label);});
   $('legend').replaceChildren();sensors.forEach((s,i)=>{const label=el('label');label.style.setProperty('--sensor',COLORS[i%COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hidden.has(s.id);input.addEventListener('change',()=>{input.checked?hidden.delete(s.id):hidden.add(s.id);draw();});label.append(input,document.createTextNode(s.name));$('legend').append(label);});draw();
 }
 function selectedRows(){return rows.filter(r=>Date.parse(r.at)>=loadedAt-days*86400000);}
@@ -77,8 +87,10 @@ function draw(){
   let has=false;
   for(const metric of ['temperature','humidity']){
     const series=sensors.map((s,i)=>({...s,color:COLORS[i%COLORS.length],points:pointsFor(rows,s.id,metric,start)})).filter(s=>!hidden.has(s.id));
-    has=renderChart({chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo})||has;
+    const plugSeries=metric==='humidity'?plugs.map((p,i)=>({...p,color:PLUG_COLORS[i%PLUG_COLORS.length],points:plugPoints(rows,p.id,start-300000,end)})).filter(p=>!hiddenPlugs.has(p.id)):[];
+    has=renderChart({plugs:plugSeries,chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo})||has;
   }
+  $('plug-note').hidden=!plugs.length||(!settings.plugOverlay.showPower&&!settings.plugOverlay.showState);
   $('summary').replaceChildren();
   for(const s of sensors.filter(s=>!hidden.has(s.id))){
     const row=el('tr');row.append(el('td',s.name));
@@ -90,7 +102,7 @@ function draw(){
   $('csv').disabled=!has;
 }
 function sample(){
-  demo=!demo;hidden.clear();
+  demo=!demo;hidden.clear();plugs=[];hiddenPlugs.clear();
   if(!demo){sensors=[];rows=[];status={state:'unconfigured'};notify('');render();load();return;}
   loadedAt=Date.now();rows=[];sensors=[{id:'sample-1',name:'サンプル A'},{id:'sample-2',name:'サンプル B'}];
   for(let i=0;i<=288;i++){const at=new Date(loadedAt-(288-i)*300000).toISOString(),values={};sensors.forEach((s,j)=>{values[s.id]={temperature:+(23+j*1.5+1.8*Math.sin(i/45+j)+.15*Math.cos(i/4)).toFixed(1),humidity:Math.round(52+j*5-6*Math.sin(i/45+j))};});rows.push({at,values});}
@@ -99,7 +111,7 @@ function sample(){
 $('refresh').addEventListener('click',()=>demo?render():load());$('demo-toggle').addEventListener('click',sample);
 document.querySelectorAll('[data-days]').forEach(button=>button.addEventListener('click',()=>{days=Number(button.dataset.days);document.querySelectorAll('[data-days]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));demo?draw():load();}));
 
-$('csv').addEventListener('click',()=>{const names=new Map(sensors.map(s=>[s.id,s.name]));const records=[['取得日時（UTC）','センサー','温度（°C）','湿度（%）','データ種別']];for(const row of selectedRows())for(const [id,v]of Object.entries(row.values))if(!hidden.has(id))records.push([row.at,names.get(id)||id,v.temperature,v.humidity,demo?'サンプル':'API取得値']);const blob=new Blob(['\ufeff'+records.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=(demo?'sample-':'')+'climate-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+$('csv').addEventListener('click',()=>{const names=new Map(sensors.map(s=>[s.id,s.name]));const records=[['取得日時（UTC）','センサー','温度（°C）','湿度（%）','データ種別']];for(const row of selectedRows())for(const [id,v]of Object.entries(row.values))if(names.has(id)&&!hidden.has(id))records.push([row.at,names.get(id)||id,v.temperature,v.humidity,demo?'サンプル':'API取得値']);const blob=new Blob(['\ufeff'+records.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=(demo?'sample-':'')+'climate-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 load();
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(draw,150);});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!demo)load();});

@@ -1,4 +1,4 @@
-import {insideRoom,planBounds,orthographicProjection} from './spatial.mjs?v=5';
+import {insideRoom,planBounds,orthographicProjection} from './spatial.mjs?v=7';
 const $=id=>document.getElementById(id);
 const svg=(tag,attrs={},label)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(label!==undefined)e.textContent=label;return e;};
 export class PositionEditor{

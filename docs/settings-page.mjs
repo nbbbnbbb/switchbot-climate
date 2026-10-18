@@ -1,14 +1,20 @@
-import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=5';
-import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=5';
-import {PositionEditor} from './position-editor.mjs?v=5';
+import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=7';
+import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=7';
+import {PositionEditor} from './position-editor.mjs?v=7';
 const $=id=>document.getElementById(id);
 const positionEditor=new PositionEditor();
-let sensors=[],expectedSha=null,loaded=false,dirty=false,saving=false,pending=null;
+let plugs=[],sensors=[],expectedSha=null,loaded=false,dirty=false,saving=false,pending=null;
 function message(value,error=false){$('settings-message').textContent=value;$('settings-message').classList.toggle('error',error);$('settings-message').hidden=!value;}
 function fill(input){
   const settings=normalizeSettings(input);
   positionEditor.set(settings,sensors);
   fillHeatmap(settings.heatmap);
+  const overlay=settings.plugOverlay;
+  for(const key of ['showPower','showState'])$('plug-'+key).checked=overlay[key];
+  $('plug-powerMax-auto').checked=overlay.powerMax===null;$('plug-powerMax').disabled=overlay.powerMax===null;if(overlay.powerMax!==null)$('plug-powerMax').value=overlay.powerMax;
+  $('settings-plugs').replaceChildren();
+  for(const p of plugs){const label=document.createElement('label');label.className='check';const input=document.createElement('input');input.type='checkbox';input.dataset.plug=p.id;input.checked=overlay.visiblePlugIds===null||overlay.visiblePlugIds.includes(p.id);label.append(input,document.createTextNode(p.name));$('settings-plugs').append(label);}
+  if(!plugs.length)$('settings-plugs').textContent='プラグの取得を待っています。';
   for(const metric of ['temperature','humidity'])for(const side of ['min','max']){
     const value=settings.axes[metric][side],id=metric+'-'+side;
     $(id+'-auto').checked=value===null;$(id).disabled=value===null;
@@ -34,6 +40,8 @@ function formSettings(){
   input.visibleSensorIds=selected.length===sensors.length?null:selected;
   Object.assign(input,positionEditor.read());
   input.heatmap=readHeatmap();
+  const selectedPlugs=[...document.querySelectorAll('[data-plug]:checked')].map(e=>e.dataset.plug);
+  input.plugOverlay={showPower:$('plug-showPower').checked,showState:$('plug-showState').checked,visiblePlugIds:selectedPlugs.length===plugs.length?null:selectedPlugs,powerMax:$('plug-powerMax-auto').checked?null:$('plug-powerMax').value.trim()===''?NaN:Number($('plug-powerMax').value)};
   return normalizeSettings(input);
 }
 function colorPreview(metric){
@@ -66,7 +74,7 @@ async function load(){
   $('reload-settings').disabled=true;
   try{
     const [latest,published]=await Promise.all([fetch('./data/latest.json?t='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('センサーを読み込めませんでした。');return r.json();}),readSharedSettings()]);
-    sensors=latest.sensors;
+    sensors=latest.sensors;plugs=latest.plugs??[];
     let canonical;try{canonical=await readRepositorySettings();}catch{}
     expectedSha=canonical?.sha??null;fill(canonical?.settings??published);loaded=true;dirty=false;$('save-settings').disabled=false;
     message(canonical?'現在の共有設定を読み込みました。変更は保存するまで他の閲覧者には反映されません。':'共有設定を読み込みました。保存時にGitHub上の最新設定を確認します。');
@@ -93,3 +101,5 @@ $('admin-form').addEventListener('submit',async event=>{
 });
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
 load();
+
+$('plug-powerMax-auto').addEventListener('change',()=>{$('plug-powerMax').disabled=$('plug-powerMax-auto').checked;});

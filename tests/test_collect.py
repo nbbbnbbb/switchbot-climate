@@ -107,5 +107,73 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(self.read("manifest.json")["months"], ["2026-10", "2026-11"])
 
 
+    def test_retired_co2_is_never_polled_even_when_configured(self):
+        devices = [{"deviceId": "co2-private", "deviceType": "MeterPro(CO2)", "deviceName": "CO2センサー（温湿度計） "}, {"deviceId": "meter", "deviceType": "Meter", "deviceName": "室内"}]
+        self.env["SWITCHBOT_DEVICES"] = json.dumps([{"id": "co2-private", "alias": "renamed"}, {"id": "meter", "alias": "meter"}])
+        requested = []
+        def response(path, *args):
+            requested.append(path)
+            if path == "devices":
+                return {"deviceList": devices}
+            self.assertNotIn("co2-private", path)
+            return {"temperature": 22, "humidity": 50}
+        self.assertEqual(self.run_collection(response), 0)
+        self.assertEqual(requested, ["devices", "devices/meter/status"])
+        self.assertEqual([s["name"] for s in self.read("latest.json")["sensors"]], ["室内"])
+
+    def test_hub_and_named_plugs_are_discovered_and_empty_hub_is_not_a_fake_zero(self):
+        env = {k: v for k, v in self.env.items() if k != "SWITCHBOT_DEVICES"}
+        devices = [{"deviceId": "hub-private", "deviceType": "Hub Mini2", "deviceName": "ハブミニ 22"}, {"deviceId": "plug-a-private", "deviceType": "Plug Mini (JP)", "deviceName": "プラグミニ A"}, {"deviceId": "plug-b-private", "deviceType": "Plug Mini (JP)", "deviceName": "プラグミニ B"}, {"deviceId": "unselected-private", "deviceType": "Plug Mini (JP)", "deviceName": "別のプラグ"}]
+        def response(path, *args):
+            if path == "devices":
+                return {"deviceList": devices}
+            self.assertNotIn("unselected-private", path)
+            if "hub-private" in path:
+                return {}
+            return {"power": "on" if "plug-a" in path else "off", "weight": 0, "deviceId": "DO-NOT-PUBLISH", "voltage": 100, "electricCurrent": 0}
+        self.assertEqual(self.run_collection(response, env), 0)
+        latest = self.read("latest.json")
+        hub = latest["sensors"][0]
+        self.assertEqual(hub["state"], "unavailable")
+        self.assertNotIn("temperature", hub)
+        self.assertNotIn("collectedAt", hub)
+        self.assertEqual([p["power"] for p in latest["plugs"]], ["on", "off"])
+        self.assertTrue(all(p["powerWatts"] == 0 for p in latest["plugs"]))
+        row = self.read("history/2026-10.json")[0]
+        self.assertEqual(row["values"], {})
+        self.assertEqual(len(row["plugs"]), 2)
+        for file in self.root.rglob("*.json"):
+            for private in ["hub-private", "plug-a-private", "plug-b-private", "DO-NOT-PUBLISH"]:
+                self.assertNotIn(private, file.read_text())
+
+    def test_hub_supported_readings_use_normal_climate_history(self):
+        env = {k: v for k, v in self.env.items() if k != "SWITCHBOT_DEVICES"}
+        def response(path, *args):
+            if path == "devices":
+                return {"deviceList": [{"deviceId": "hub", "deviceType": "Hub Mini2", "deviceName": "ハブミニ22"}]}
+            return {"temperature": 23.7, "humidity": 53}
+        self.assertEqual(self.run_collection(response, env), 0)
+        hub = self.read("latest.json")["sensors"][0]
+        self.assertEqual(hub["temperature"], 23.7)
+        self.assertIn(hub["id"], self.read("history/2026-10.json")[0]["values"])
+
+    def test_plug_failure_preserves_timestamp_without_new_history(self):
+        self.env["SWITCHBOT_DEVICES"] = json.dumps([{"id": "plug", "alias": "plug", "name": "プラグミニA", "deviceType": "Plug Mini (JP)"}])
+        def response(path, *args):
+            if path == "devices":
+                return {"deviceList": []}
+            return {"power": "on", "weight": 123.5}
+        self.assertEqual(self.run_collection(response), 0)
+        self.now = datetime(2026, 10, 17, 1, 5, tzinfo=timezone.utc)
+        self.assertEqual(self.run_collection(lambda path, *args: {"deviceList": []} if path == "devices" else {"power": "off", "weight": None}), 1)
+        plug = self.read("latest.json")["plugs"][0]
+        self.assertEqual(plug["power"], "on")
+        self.assertEqual(plug["collectedAt"], "2026-10-17T01:00:00Z")
+        self.assertEqual(len(self.read("history/2026-10.json")), 1)
+        for body in [{"power": "on", "weight": True}, {"power": "unknown", "weight": 0}, {"power": "off", "weight": -1}, {"power": "off", "weight": float("inf")}]:
+            with self.assertRaises(ValueError):
+                collector.validate_plug(body)
+
+
 if __name__ == "__main__":
     unittest.main()

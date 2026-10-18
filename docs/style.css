@@ -10,3 +10,6 @@
 
 .history-panel{margin-bottom:30px}.history-panel .panel-heading{gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.history-range{display:block;text-align:right;margin:0 0 16px;line-height:1.6}.time-grid{stroke:#becbd8;stroke-width:.7;vector-effect:non-scaling-stroke}.time-grid.whole-hour{stroke:#93a7b9;stroke-width:1}.time-tick{font-variant-numeric:tabular-nums}
 @media(max-width:700px){.history-panel .panel-heading{align-items:flex-start;flex-direction:column;gap:15px}.history-panel .periods{width:100%}.history-range{font-size:10px;text-align:left}.history-panel .periods button{min-width:44px;padding:7px 8px}}
+.metric-chart h3 small{display:block;font-size:10px;font-weight:400;color:#738092;margin-top:6px}.plug-legend{margin-top:12px;border-top:1px solid var(--line);padding-top:14px}.plug-note{margin:0 0 14px}.plug-lane-label,.plug-state-label{font-size:8px!important}.power-tick{fill:#9a6f46!important}.plug-power{stroke-width:2;fill:none}.plug-card .value{font-size:29px}.plug-legend label{line-height:1.8}.plug-note[hidden]{display:none}
+
+.metric-chart h3{min-height:60px}

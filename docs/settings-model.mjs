@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS={
   refreshSeconds:60,gapMinutes:20,staleMinutes:5,
   room:{width:2,depth:2,height:2.4,apexX:0,dimensionsConfirmed:false},
   sensorPositions:{},
+  plugOverlay:{showPower:true,showState:true,visiblePlugIds:null,powerMax:null},
   heatmap:{axes:{temperature:{min:null,max:null},humidity:{min:null,max:null}},colors:{temperature:{low:'#2563eb',mid:'#f2d264',high:'#df493e',midpoint:0.5},humidity:{low:'#f0dfb1',mid:'#54bcad',high:'#414b9c',midpoint:0.5}},power:2,maxAgeMinutes:5,showLabels:true},
   showPoints:false,showCards:true,showSummary:true,showReadings:true,lineWidth:2,
 };
@@ -76,6 +77,16 @@ export function normalizeSettings(input={}) {
   result.heatmap.maxAgeMinutes=number(heatmap.maxAgeMinutes??5,1,60,'ヒートマップの有効時間');
   if(heatmap.showLabels!==undefined&&typeof heatmap.showLabels!=='boolean')throw new Error('ラベル設定が正しくありません。');
   result.heatmap.showLabels=heatmap.showLabels??true;
+  const overlay=input.plugOverlay??{};
+  for(const key of ['showPower','showState']){
+    if(overlay[key]!==undefined&&typeof overlay[key]!=='boolean')throw new Error('プラグの表示設定が正しくありません。');
+    result.plugOverlay[key]=overlay[key]??true;
+  }
+  if(overlay.powerMax!==undefined&&overlay.powerMax!==null)result.plugOverlay.powerMax=number(overlay.powerMax,0.1,100000,'消費電力の最大値');
+  if(overlay.visiblePlugIds!==undefined&&overlay.visiblePlugIds!==null){
+    if(!Array.isArray(overlay.visiblePlugIds)||overlay.visiblePlugIds.length>100||overlay.visiblePlugIds.some(id=>typeof id!=='string'||!/^[a-z0-9-]{1,48}$/.test(id)))throw new Error('プラグの選択が正しくありません。');
+    result.plugOverlay.visiblePlugIds=[...new Set(overlay.visiblePlugIds)].sort();
+  }
   return result;
 }
 export function axisDomain(values,metric,bounds={min:null,max:null}) {
