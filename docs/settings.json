@@ -32,27 +32,27 @@
   },
   "sensorPositions": {
     "sensor-2841a651b49b": {
-      "x": 0.99,
-      "y": 1.55,
-      "z": 0.31,
+      "x": 1.15,
+      "y": 1.24,
+      "z": 0.36,
       "enabled": true
     },
     "sensor-340389ae8d7a": {
-      "x": 1,
-      "y": 1.55,
-      "z": 2.18,
+      "x": 0.87,
+      "y": 1.24,
+      "z": 2.13,
       "enabled": true
     },
     "sensor-b2bbde86cfef": {
-      "x": 0.99,
-      "y": 0.12,
-      "z": 1.22,
+      "x": 0.94,
+      "y": 0.07,
+      "z": 1.19,
       "enabled": true
     },
     "sensor-d801c41f42cd": {
-      "x": 2,
-      "y": 0.29,
-      "z": 1.22,
+      "x": 0.76,
+      "y": 1.6,
+      "z": 1.21,
       "enabled": true
     },
     "sensor-366fdb19e85c": {
@@ -67,6 +67,12 @@
       "z": 1.2,
       "enabled": true
     }
+  },
+  "plugOverlay": {
+    "showPower": true,
+    "showState": true,
+    "visiblePlugIds": null,
+    "powerMax": null
   },
   "heatmap": {
     "axes": {
