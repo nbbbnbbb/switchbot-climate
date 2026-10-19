@@ -3,17 +3,15 @@ name: Collect and publish climate
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/data/**', 'docs/settings.json', 'README.md']
-  schedule:
-    - cron: '2-59/10 * * * *'
+    paths: ['scripts/**', '.github/workflows/climate.yml']
   workflow_dispatch:
     inputs:
       continuous:
-        description: Automatically continue with the next sampling window
+        description: Restart automatically after the long sampling session
         type: boolean
         default: true
       samples:
-        description: Number of two-minute samples (5 for normal operation; 2 for verification)
+        description: Legacy dispatch compatibility (collection now runs continuously)
         type: choice
         options: ['5', '2', '1']
         default: '5'
@@ -22,108 +20,34 @@ permissions:
   contents: read
 
 concurrency:
-  group: climate-publish
+  group: climate-collector
   cancel-in-progress: false
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
     permissions:
       actions: write
       contents: write
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.sample1.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-      - name: Check connection configuration
-        id: connection
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Test collector and scheduling
+        run: python3 -m unittest discover -s tests -v
+      - name: Continuous two-minute collection
+        id: collect
         env:
           SWITCHBOT_TOKEN: ${{ secrets.SWITCHBOT_TOKEN }}
           SWITCHBOT_SECRET: ${{ secrets.SWITCHBOT_SECRET }}
-        run: |
-          if [ -n "$SWITCHBOT_TOKEN" ] && [ -n "$SWITCHBOT_SECRET" ]; then
-            echo 'configured=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'configured=false' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Test collector and scheduling
-        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
-        run: |
-          python3 -m unittest discover -s tests -v
-          node --test tests/*.test.mjs
-      - name: Configure Pages
-        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
-        uses: actions/configure-pages@v5
-      - name: Start ten-minute sampling window
-        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
-        run: echo "CLIMATE_WINDOW_START=$(date +%s)" >> "$GITHUB_ENV"
-      - name: Sample 1 and publish
-        id: sample1
-        if: github.event_name != 'schedule' || steps.connection.outputs.configured == 'true'
-        continue-on-error: true
-        uses: ./.github/actions/sample-and-publish
-        with:
-          slot: '1'
-          configured: ${{ steps.connection.outputs.configured }}
-          token: ${{ secrets.SWITCHBOT_TOKEN }}
-          secret: ${{ secrets.SWITCHBOT_SECRET }}
-          devices: ${{ secrets.SWITCHBOT_DEVICES }}
-      - name: Sample 2 and publish
-        id: sample2
-        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 2))
-        continue-on-error: true
-        uses: ./.github/actions/sample-and-publish
-        with:
-          slot: '2'
-          configured: ${{ steps.connection.outputs.configured }}
-          token: ${{ secrets.SWITCHBOT_TOKEN }}
-          secret: ${{ secrets.SWITCHBOT_SECRET }}
-          devices: ${{ secrets.SWITCHBOT_DEVICES }}
-      - name: Sample 3 and publish
-        id: sample3
-        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 3))
-        continue-on-error: true
-        uses: ./.github/actions/sample-and-publish
-        with:
-          slot: '3'
-          configured: ${{ steps.connection.outputs.configured }}
-          token: ${{ secrets.SWITCHBOT_TOKEN }}
-          secret: ${{ secrets.SWITCHBOT_SECRET }}
-          devices: ${{ secrets.SWITCHBOT_DEVICES }}
-      - name: Sample 4 and publish
-        id: sample4
-        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 4))
-        continue-on-error: true
-        uses: ./.github/actions/sample-and-publish
-        with:
-          slot: '4'
-          configured: ${{ steps.connection.outputs.configured }}
-          token: ${{ secrets.SWITCHBOT_TOKEN }}
-          secret: ${{ secrets.SWITCHBOT_SECRET }}
-          devices: ${{ secrets.SWITCHBOT_DEVICES }}
-      - name: Sample 5 and publish
-        id: sample5
-        if: steps.connection.outputs.configured == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && fromJSON(inputs.samples || '5') >= 5))
-        continue-on-error: true
-        uses: ./.github/actions/sample-and-publish
-        with:
-          slot: '5'
-          configured: ${{ steps.connection.outputs.configured }}
-          token: ${{ secrets.SWITCHBOT_TOKEN }}
-          secret: ${{ secrets.SWITCHBOT_SECRET }}
-          devices: ${{ secrets.SWITCHBOT_DEVICES }}
-      - name: Report failed sample cycles
-        if: always() && contains(steps.*.outcome, 'failure')
-        run: |
-          echo 'One or more sample cycles failed. Check the cycle logs and published status.'
-          exit 1
-      - name: Queue next sampling window
-        if: always() && !cancelled() && steps.connection.outputs.configured == 'true' && (github.event_name != 'workflow_dispatch' || inputs.continuous)
+          SWITCHBOT_DEVICES: ${{ secrets.SWITCHBOT_DEVICES }}
+        run: python3 scripts/continuous_collect.py
+      - name: Restart the next long sampling session
+        if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.continuous)
         env:
           GH_TOKEN: ${{ github.token }}
-          CLIMATE_SAMPLE_COUNT: ${{ github.event_name == 'push' && '1' || inputs.samples || '5' }}
+          CLIMATE_SAMPLE_COUNT: '1'
+          CLIMATE_WINDOW_START: '0'
         run: python3 scripts/dispatch_next.py

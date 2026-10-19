@@ -1,3 +1,4 @@
+import {createLiveReader,attemptedTime,mergeHistory} from './live-data.mjs?v=11';
 import {PLUG_COLORS,plugPoints,plugLabel} from './plugs.mjs?v=9';
 import {visibleClimateSensors,labelClimateSensors} from './devices.mjs?v=10';
 import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=7';
@@ -11,6 +12,7 @@ const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit
 let plugs=[],sensors=[],rows=[],status={},days=1,metric='temperature',demo=false,busy=false,loadedAt=Date.now();
 const hidden=new Set(),hiddenPlugs=new Set();
 const heatmap=new HeatmapViewer();
+const readLive=createLiveReader();
 let settings=normalizeSettings(DEFAULT_SETTINGS),settingsApplied=false,refreshTimer=null;
 let previewSettings=null;
 try{const raw=new URLSearchParams(location.search).get('preview');if(raw)previewSettings=normalizeSettings(JSON.parse(raw));}catch{}
@@ -27,25 +29,33 @@ function applySettings(next){
   document.querySelectorAll('[data-days]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.days)===days)));
 
   $('sensor-cards').hidden=!settings.showCards;$('summary-section').hidden=!settings.showSummary;$('readings-section').hidden=!settings.showReadings;
-  $('cadence-label').textContent='約2分ごとに収集・公開／画面は'+settings.refreshSeconds+'秒ごとに再読込';
+  $('cadence-label').textContent='約2分ごとに収集／画面は'+settings.refreshSeconds+'秒ごとに再読込';
   $('gap-label').textContent=settings.gapMinutes+'分を超える取得の空白は線をつなぎません。';
 }
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const svg=(tag,attrs,text)=>{const n=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
-async function json(path){const r=await fetch(path+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('Load failed');return r.json();}
+const boundedFetch=(url,options={})=>fetch(url,{...options,signal:AbortSignal.timeout(12000)});
+async function json(path){const r=await boundedFetch(path+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('Load failed');return r.json();}
 function notify(text){$('notice').textContent=text;$('notice').hidden=!text;}
 async function load(){
   if(busy||demo)return;busy=true;$('refresh').disabled=true;
   try{
-    const [latest,state,manifest,shared]=await Promise.all([json('./data/latest.json'),json('./data/status.json'),json('./data/manifest.json'),readSharedSettings().catch(()=>null)]);
+    const primary=await Promise.allSettled([json('./data/latest.json'),json('./data/status.json'),json('./data/manifest.json'),readSharedSettings(boundedFetch)]);
+    const value=i=>primary[i].status==='fulfilled'?primary[i].value:null;
+    let latest=value(0),state=value(1),manifest=value(2),shared=value(3),direct=false,live=null;
+    if(!latest||!state||Date.now()-attemptedTime(state)>120000){
+      live=await readLive();
+      if(live&&(!latest||attemptedTime(live.status)>=attemptedTime(state))){latest=live.latest;state=live.status;manifest=live.manifest??manifest;shared=live.settings?normalizeSettings(live.settings):shared;direct=true;}
+    }
+    if(!latest||!state)throw new Error('No available data');
     sensors=visibleClimateSensors(latest.sensors);plugs=(latest.plugs??[]).map(p=>({...p,name:plugLabel(p)}));applySettings(previewSettings||shared||settings);
     const cutoff=new Date(Date.now()-days*86400000).toISOString().slice(0,7);
-    const months=manifest.months.filter(m=>/^\d{4}-\d{2}$/.test(m)&&m>=cutoff);
-    const results=await Promise.allSettled(months.map(m=>json('./data/history/'+m+'.json')));
-    sensors=visibleClimateSensors(latest.sensors);status=state;rows=results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);loadedAt=Date.now();
-    const partial=results.some(r=>r.status==='rejected');
-    notify(previewSettings?'設定プレビュー：この表示はまだ共有保存されていません。':partial?'一部の履歴を読み込めませんでした。しばらくしてから更新してください。':!shared?'共有設定を読み込めませんでした。前回の設定で表示しています。':state.message||'');
+    const months=(manifest?.months??[]).filter(m=>/^\d{4}-\d{2}$/.test(m)&&m>=cutoff);
+    const results=await Promise.allSettled(months.map(m=>json((direct?'https://raw.githubusercontent.com/nbbbnbbb/switchbot-climate/main/docs/data/history/':'./data/history/')+m+'.json')));
+    sensors=visibleClimateSensors(latest.sensors);status=state;rows=mergeHistory(results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value),live?.rows??[]);loadedAt=Date.now();
+    const partial=results.some(r=>r.status==='rejected')||!manifest;
+    notify(previewSettings?'設定プレビュー：この表示はまだ共有保存されていません。':state.message||(!shared?'共有設定を読み込めませんでした。前回の設定で表示しています。':direct?'リポジトリの保存記録を直接表示しています。'+(partial?' 古い履歴は一部未読込です。':''):partial?'一部の履歴を読み込めませんでした。しばらくしてから更新してください。':''));
     render();
   }catch{notify('データを読み込めませんでした。通信状態を確認し、更新してください。');$('connection-label').textContent='読込エラー';$('status-dot').className='dot error';}
   finally{busy=false;$('refresh').disabled=false;}
@@ -60,7 +70,7 @@ function render(){
   $('last-update').textContent=last?'最終取得 '+date.format(last)+'（'+Math.max(0,Math.floor((Date.now()-last)/60000))+'分前）':'実データはまだありません';
   $('setup').hidden=Boolean(sensors.length)&&!demo;
   $('demo-toggle').textContent=demo?'サンプル表示を終了する →':'サンプルデータで表示を試す →';
-  if(!demo&&last&&stale&&!$('notice').textContent)notify('最後の取得から'+settings.staleMinutes+'分以上経過しています。収集が遅延または停止している可能性があります。表示値の取得日時を確認してください。');
+  if(!demo&&last&&stale&&!$('notice').textContent.includes('最後の取得から'))notify(($('notice').textContent?$('notice').textContent+' ':'')+'最後の取得から'+settings.staleMinutes+'分以上経過しています。収集が遅延または停止している可能性があります。表示値の取得日時を確認してください。');
   $('sensor-cards').replaceChildren();
   sensors.forEach((s,i)=>{
     const card=el('article',undefined,'sensor-card'+(s.outdoor?' outdoor-card':''));card.style.setProperty('--sensor',COLORS[i%COLORS.length]);
@@ -121,3 +131,6 @@ $('csv').addEventListener('click',()=>{const names=new Map(sensors.map(s=>[s.id,
 load();
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(draw,150);});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!demo)load();});
+
+window.addEventListener('online',()=>{if(!demo)load();});
+window.addEventListener('pageshow',()=>{if(!demo)load();});

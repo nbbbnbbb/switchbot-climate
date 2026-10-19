@@ -1,0 +1,41 @@
+name: Publish dashboard
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/data/**', 'README.md']
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: climate-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - name: Verify dashboard and collector
+        run: |
+          node --test tests/*.test.mjs
+          python3 -m unittest discover -s tests -v
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs
+          retention-days: 1
+      - uses: actions/deploy-pages@v4
+        id: deploy
