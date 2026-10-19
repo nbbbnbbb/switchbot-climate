@@ -32,14 +32,14 @@
   },
   "sensorPositions": {
     "sensor-2841a651b49b": {
-      "x": 1.15,
-      "y": 1.24,
+      "x": 1.18,
+      "y": 1.23,
       "z": 0.36,
       "enabled": true
     },
     "sensor-340389ae8d7a": {
-      "x": 0.87,
-      "y": 1.24,
+      "x": 0.83,
+      "y": 1.23,
       "z": 2.13,
       "enabled": true
     },
@@ -50,8 +50,8 @@
       "enabled": true
     },
     "sensor-d801c41f42cd": {
-      "x": 0.76,
-      "y": 1.6,
+      "x": 0.82,
+      "y": 1.67,
       "z": 1.21,
       "enabled": true
     },
