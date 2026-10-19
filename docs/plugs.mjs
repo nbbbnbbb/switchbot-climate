@@ -1,4 +1,9 @@
 export const PLUG_COLORS=['#c06016','#6e4fb0'];
+export function plugLabel(plug){
+  const name=plug.name??'',key=name.normalize('NFKC').replace(/\s/g,'');
+  const purpose={'プラグミニA':'除湿機','プラグミニB':'加湿機'}[key];
+  return purpose?name+'（'+purpose+'）':name;
+}
 export function plugPoints(rows,id,start=-Infinity,end=Infinity){
   const byTime=new Map();
   for(const row of rows){const at=Date.parse(row.at),v=row.plugs?.[id];if(!v||!Number.isFinite(at)||at<start||at>end||!['on','off'].includes(v.power)||typeof v.powerWatts!=='number'||!Number.isFinite(v.powerWatts)||v.powerWatts<0)continue;byTime.set(at,{at,value:v.powerWatts,power:v.power});}

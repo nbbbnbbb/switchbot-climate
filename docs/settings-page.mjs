@@ -1,3 +1,5 @@
+import {visibleClimateSensors} from './devices.mjs?v=9';
+import {plugLabel} from './plugs.mjs?v=9';
 import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=7';
 import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=7';
 import {PositionEditor} from './position-editor.mjs?v=7';
@@ -13,7 +15,7 @@ function fill(input){
   for(const key of ['showPower','showState'])$('plug-'+key).checked=overlay[key];
   $('plug-powerMax-auto').checked=overlay.powerMax===null;$('plug-powerMax').disabled=overlay.powerMax===null;if(overlay.powerMax!==null)$('plug-powerMax').value=overlay.powerMax;
   $('settings-plugs').replaceChildren();
-  for(const p of plugs){const label=document.createElement('label');label.className='check';const input=document.createElement('input');input.type='checkbox';input.dataset.plug=p.id;input.checked=overlay.visiblePlugIds===null||overlay.visiblePlugIds.includes(p.id);label.append(input,document.createTextNode(p.name));$('settings-plugs').append(label);}
+  for(const p of plugs){const label=document.createElement('label');label.className='check';const input=document.createElement('input');input.type='checkbox';input.dataset.plug=p.id;input.checked=overlay.visiblePlugIds===null||overlay.visiblePlugIds.includes(p.id);label.append(input,document.createTextNode(plugLabel(p)));$('settings-plugs').append(label);}
   if(!plugs.length)$('settings-plugs').textContent='プラグの取得を待っています。';
   for(const metric of ['temperature','humidity'])for(const side of ['min','max']){
     const value=settings.axes[metric][side],id=metric+'-'+side;
@@ -74,7 +76,7 @@ async function load(){
   $('reload-settings').disabled=true;
   try{
     const [latest,published]=await Promise.all([fetch('./data/latest.json?t='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('センサーを読み込めませんでした。');return r.json();}),readSharedSettings()]);
-    sensors=latest.sensors;plugs=latest.plugs??[];
+    sensors=visibleClimateSensors(latest.sensors);plugs=latest.plugs??[];
     let canonical;try{canonical=await readRepositorySettings();}catch{}
     expectedSha=canonical?.sha??null;fill(canonical?.settings??published);loaded=true;dirty=false;$('save-settings').disabled=false;
     message(canonical?'現在の共有設定を読み込みました。変更は保存するまで他の閲覧者には反映されません。':'共有設定を読み込みました。保存時にGitHub上の最新設定を確認します。');

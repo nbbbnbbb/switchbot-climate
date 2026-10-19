@@ -1,9 +1,10 @@
-import {PLUG_COLORS,plugPoints} from './plugs.mjs?v=7';
+import {PLUG_COLORS,plugPoints,plugLabel} from './plugs.mjs?v=9';
+import {visibleClimateSensors} from './devices.mjs?v=9';
 import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=7';
 import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=7';
 import {readSharedSettings} from './settings-store.mjs?v=7';
-import {HeatmapViewer} from './heatmap.mjs?v=7';
-import {renderChart} from './graph.mjs?v=7';
+import {HeatmapViewer} from './heatmap.mjs?v=9';
+import {renderChart,renderPlugStates} from './graph.mjs?v=9';
 const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
@@ -38,11 +39,11 @@ async function load(){
   if(busy||demo)return;busy=true;$('refresh').disabled=true;
   try{
     const [latest,state,manifest,shared]=await Promise.all([json('./data/latest.json'),json('./data/status.json'),json('./data/manifest.json'),readSharedSettings().catch(()=>null)]);
-    sensors=latest.sensors.filter(s=>s.id!=='sensor-b8a1a0585a7f'&&!s.name.toUpperCase().includes('CO2'));plugs=latest.plugs??[];applySettings(previewSettings||shared||settings);
+    sensors=visibleClimateSensors(latest.sensors);plugs=(latest.plugs??[]).map(p=>({...p,name:plugLabel(p)}));applySettings(previewSettings||shared||settings);
     const cutoff=new Date(Date.now()-days*86400000).toISOString().slice(0,7);
     const months=manifest.months.filter(m=>/^\d{4}-\d{2}$/.test(m)&&m>=cutoff);
     const results=await Promise.allSettled(months.map(m=>json('./data/history/'+m+'.json')));
-    sensors=latest.sensors.filter(s=>s.id!=='sensor-b8a1a0585a7f'&&!s.name.toUpperCase().includes('CO2'));status=state;rows=results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);loadedAt=Date.now();
+    sensors=visibleClimateSensors(latest.sensors);status=state;rows=results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);loadedAt=Date.now();
     const partial=results.some(r=>r.status==='rejected');
     notify(previewSettings?'設定プレビュー：この表示はまだ共有保存されていません。':partial?'一部の履歴を読み込めませんでした。しばらくしてから更新してください。':!shared?'共有設定を読み込めませんでした。前回の設定で表示しています。':state.message||'');
     render();
@@ -87,10 +88,14 @@ function draw(){
   let has=false;
   for(const metric of ['temperature','humidity']){
     const series=sensors.map((s,i)=>({...s,color:COLORS[i%COLORS.length],points:pointsFor(rows,s.id,metric,start)})).filter(s=>!hidden.has(s.id));
-    const plugSeries=metric==='humidity'?plugs.map((p,i)=>({...p,color:PLUG_COLORS[i%PLUG_COLORS.length],points:plugPoints(rows,p.id,start-300000,end)})).filter(p=>!hiddenPlugs.has(p.id)):[];
-    has=renderChart({plugs:plugSeries,chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo})||has;
+    has=renderChart({chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo})||has;
   }
-  $('plug-note').hidden=!plugs.length||(!settings.plugOverlay.showPower&&!settings.plugOverlay.showState);
+  const plugSeries=plugs.map((p,i)=>({...p,number:i+1,color:PLUG_COLORS[i%PLUG_COLORS.length],points:plugPoints(rows,p.id,start-300000,end)})).filter(p=>!hiddenPlugs.has(p.id));
+  const showPower=settings.plugOverlay.showPower,showState=settings.plugOverlay.showState;
+  $('power-section').hidden=!plugs.length||(!showPower&&!showState);
+  $('power-wrap').hidden=!showPower;$('plug-states-wrap').hidden=!showState;
+  has=renderChart({chart:$('chart-power'),tooltip:$('tooltip-power'),empty:$('chart-empty-power'),series:showPower?plugSeries:[],start,end,metric:'power',settings,demo})||has;
+  renderPlugStates({chart:$('chart-plug-states'),tooltip:$('tooltip-plug-states'),series:showState?plugSeries:[],start,end});
   $('summary').replaceChildren();
   for(const s of sensors.filter(s=>!hidden.has(s.id))){
     const row=el('tr');row.append(el('td',s.name));

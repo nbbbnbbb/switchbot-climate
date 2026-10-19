@@ -181,7 +181,7 @@ def collect(data_dir=ROOT / "docs/data", env=None, request=api, now=None):
         write_json(data_dir / "manifest.json", {"months": sorted(p.stem for p in (data_dir / "history").glob("????-??.json"))})
     write_json(latest_path, {"sensors": sensors, "plugs": plugs})
     state = "ok" if not failed else "error" if failed == len(devices) else "partial"
-    write_json(data_dir / "status.json", {"state": state, "attemptedAt": at, "message": "一部の機器から取得できませんでした。取得日時を確認してください。" if failed else "ハブミニ22は通常APIから温湿度を取得できません。他の機器は収集中です。" if unavailable else ""})
+    write_json(data_dir / "status.json", {"state": state, "attemptedAt": at, "message": "一部の機器から取得できませんでした。取得日時を確認してください。" if failed else ""})
     print(f"Collected {len(readings)} climate sensors and {len(plug_readings)} plugs; {unavailable} devices unavailable.")
     return 1 if failed else 0
 

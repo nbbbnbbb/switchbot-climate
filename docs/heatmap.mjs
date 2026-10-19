@@ -1,29 +1,31 @@
 import {axisDomain} from './settings-model.mjs?v=7';
-import {insideRoom,makeIndex,frameSensors,interpolate,colorAt,triangleMesh,wallMesh,planBounds} from './spatial.mjs?v=7';
+import {insideRoom,makeIndex,frameSensors,interpolate,colorAt,triangleMesh,wallMesh,planBounds,frontViewYaw} from './spatial.mjs?v=9';
 const fmt=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const $=id=>document.getElementById(id);
 export class HeatmapViewer{
   constructor(){
-    this.canvas=$('heatmap-canvas');this.ctx=this.canvas.getContext('2d');this.metric='temperature';this.follow=true;this.frames=[];this.yaw=.65;this.elevation=.45;this.zoom=1;this.timer=null;this.data=null;this.cache=null;
+    this.canvas=$('heatmap-canvas');this.ctx=this.canvas.getContext('2d');this.metric='temperature';this.follow=true;this.frames=[];this.yaw=Math.PI;this.elevation=.45;this.zoom=1;this.timer=null;this.data=null;this.cache=null;
     document.querySelectorAll('[data-heat-metric]').forEach(b=>b.addEventListener('click',()=>{this.metric=b.dataset.heatMetric;document.querySelectorAll('[data-heat-metric]').forEach(t=>t.setAttribute('aria-selected',String(t===b)));this.updateFrame();}));
     $('heat-time').addEventListener('input',()=>{this.stop();this.follow=false;this.at=this.frames[Number($('heat-time').value)];this.updateFrame();});
     $('heat-latest').addEventListener('click',()=>{this.stop();this.follow=true;this.at=this.frames.at(-1);this.updateFrame();});
     for(const [id,delta]of [['heat-prev',-1],['heat-next',1]])$(id).addEventListener('click',()=>{this.stop();this.follow=false;const i=this.frameIndex();this.at=this.frames[Math.max(0,Math.min(this.frames.length-1,i+delta))];this.updateFrame();});
     $('heat-play').addEventListener('click',()=>{if(this.timer)this.stop();else this.play();});
     $('heat-speed').addEventListener('change',()=>{if(this.timer){this.stop();this.play();}});
-    $('heat-reset-view').addEventListener('click',()=>{this.yaw=.65;this.elevation=.45;this.zoom=1;this.draw();});
+    $('heat-reset-view').addEventListener('click',()=>this.resetView());
     $('heat-zoom-in').addEventListener('click',()=>{this.zoom=Math.min(3,this.zoom*1.2);this.draw();});
     $('heat-zoom-out').addEventListener('click',()=>{this.zoom=Math.max(.45,this.zoom/1.2);this.draw();});
     let drag=null;
     this.canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};this.canvas.setPointerCapture(e.pointerId);});
     this.canvas.addEventListener('pointermove',e=>{if(!drag)return;this.yaw+=(e.clientX-drag.x)*.008;this.elevation=Math.max(.08,Math.min(1.4,this.elevation+(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY};this.draw();});
     const end=()=>{drag=null;};this.canvas.addEventListener('pointerup',end);this.canvas.addEventListener('pointercancel',end);
-    this.canvas.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(e.key))return;e.preventDefault();if(e.key==='Home'){this.yaw=.65;this.elevation=.45;this.zoom=1;}else if(e.key==='ArrowLeft')this.yaw-=.12;else if(e.key==='ArrowRight')this.yaw+=.12;else this.elevation=Math.max(.08,Math.min(1.4,this.elevation+(e.key==='ArrowUp'?.1:-.1)));this.draw();});
+    this.canvas.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(e.key))return;e.preventDefault();if(e.key==='Home'){this.resetView();return;}else if(e.key==='ArrowLeft')this.yaw-=.12;else if(e.key==='ArrowRight')this.yaw+=.12;else this.elevation=Math.max(.08,Math.min(1.4,this.elevation+(e.key==='ArrowUp'?.1:-.1)));this.draw();});
     this.resize=new ResizeObserver(()=>this.draw());this.resize.observe(this.canvas);
     document.addEventListener('visibilitychange',()=>{if(document.hidden)this.stop();});
   }
+  resetView(){this.yaw=this.data?frontViewYaw(this.data.settings.room):Math.PI;this.elevation=.45;this.zoom=1;this.draw();}
   frameIndex(){if(!this.frames.length)return 0;let lo=0,hi=this.frames.length;while(lo<hi){const m=(lo+hi)>>1;if(this.frames[m]<=this.at)lo=m+1;else hi=m;}return Math.max(0,lo-1);}
   update({sensors,rows,settings,start,end,demo=false}){
+    if(!this.data)this.yaw=frontViewYaw(settings.room);
     const changed=this.data?.rows!==rows;this.data={sensors,rows,settings,start,end,demo};
     if(changed){this.index=makeIndex(rows);this.cache=null;}
     this.frames=[...new Set(rows.map(r=>Date.parse(r.at)).filter(at=>Number.isFinite(at)&&at>=start&&at<=end))].sort((a,b)=>a-b);

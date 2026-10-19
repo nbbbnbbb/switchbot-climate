@@ -66,3 +66,5 @@ export function orthographicProjection(view,b){
   const scale=Math.min(540/(b.x1-b.x0),255/Math.max(b.y1-b.y0,b.z1-b.z0));
   return{range,scale,left:50+(540-(b.x1-b.x0)*scale)/2,top:35+(255-(range[1]-range[0])*scale)/2};
 }
+// Camera faces C from outside the triangle, along its centroid-to-C direction.
+export function frontViewYaw(room){return Math.atan2(room.width-2*room.apexX,-2*room.depth);}

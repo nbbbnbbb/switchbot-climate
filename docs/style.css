@@ -12,6 +12,10 @@
 @media(max-width:700px){.history-panel .panel-heading{align-items:flex-start;flex-direction:column;gap:15px}.history-panel .periods{width:100%}.history-range{font-size:10px;text-align:left}.history-panel .periods button{min-width:44px;padding:7px 8px}}
 .metric-chart h3 small{display:block;font-size:10px;font-weight:400;color:#738092;margin-top:6px}.plug-legend{margin-top:12px;border-top:1px solid var(--line);padding-top:14px}.plug-note{margin:0 0 14px}.plug-lane-label,.plug-state-label{font-size:8px!important}.power-tick{fill:#9a6f46!important}.plug-power{stroke-width:2;fill:none}.plug-card .value{font-size:29px}.plug-legend label{line-height:1.8}.plug-note[hidden]{display:none}
 
-.metric-chart h3{min-height:60px}
+.metric-chart h3{min-height:46px}
 
 .dashboard-main{padding-top:24px}.dashboard-status{display:flex;justify-content:flex-end;margin-bottom:18px}.dashboard-status .connection{padding-top:0;max-width:none}
+
+/* Power is a separate, time-aligned plot directly below humidity. */
+.humidity-column{min-width:0}.power-chart{margin-top:18px;border-top:1px solid var(--line);padding-top:2px}.power-chart h3{font-size:13px;min-height:0;margin:0 0 8px;padding:12px 0 8px;border-bottom:0}.power-chart .power-wrap,.power-chart #chart-power{height:110px;min-height:110px}.power-chart .plug-states-wrap{position:relative;width:100%;margin-top:5px}.power-chart #chart-plug-states{display:block;width:100%;height:50px;min-height:0}.power-chart .plug-legend{gap:8px 14px;min-height:0;margin-top:6px;padding:8px 0 6px;border-top:0}.power-chart .plug-note{font-size:9px;line-height:1.8;margin:2px 0 0}.power-chart[hidden],.power-wrap[hidden],.plug-states-wrap[hidden]{display:none}.power-chart .chart-empty{font-size:11px}.power-chart .tooltip{z-index:5}.power-chart .series{stroke-width:2}.power-chart svg text{font-size:10px}
+@media(max-width:700px){.power-chart .power-wrap,.power-chart #chart-power{height:100px;min-height:100px}.power-chart .plug-legend label{font-size:10px}}
