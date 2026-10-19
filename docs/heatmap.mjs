@@ -61,7 +61,7 @@ export class HeatmapViewer{
     $('heat-sensor-list').replaceChildren();
     for(const s of this.samples){const item=document.createElement('div');item.className='heat-reading';const name=document.createElement('span');name.textContent=s.name;
       const value=document.createElement('strong');value.textContent=Number.isFinite(s.value)?s.value.toFixed(1)+' '+unit:'欠測';
-      const note=document.createElement('small');note.textContent=(s.inside?'室内':'室外')+(!s.enabled?'・補間対象外':'')+' / '+(s.at?fmt.format(s.at)+' 取得':'有効な記録なし');item.append(name,value,note);$('heat-sensor-list').append(item);
+      const note=document.createElement('small');note.textContent=(s.inside?'室内':'外気')+(!s.enabled?'・補間対象外':'')+' / '+(s.at?fmt.format(s.at)+' 取得':'有効な記録なし');item.append(name,value,note);$('heat-sensor-list').append(item);
     }
     const missing=sensors.length-this.samples.length;$('heat-unplaced').textContent=missing?'未配置 '+missing+'台：設定画面の2面図で配置してください。':'';
     this.cache=null;this.draw();
@@ -95,7 +95,7 @@ export class HeatmapViewer{
     for(const s of positioned){const p=s.screen,value=Number.isFinite(s.value),color=value?colorAt(s.value,this.domain.min,this.domain.max,settings.heatmap.colors[this.metric]):'#9baab9';
       ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle=s.inside?'#fff':'#354e6b';ctx.lineWidth=2;ctx.stroke();
       if(!settings.heatmap.showLabels)continue;
-      const label=s.name+' · '+(value?s.value.toFixed(1)+(this.metric==='temperature'?' °C':' %'):'欠測')+(s.inside?'':' 外');ctx.font='600 12px system-ui';const w=ctx.measureText(label).width+18;
+      const label=s.name+' · '+(value?s.value.toFixed(1)+(this.metric==='temperature'?' °C':' %'):'欠測');ctx.font='600 12px system-ui';const w=ctx.measureText(label).width+18;
       let x=Math.max(4,Math.min(width-w-4,p.x+12)),y=Math.max(4,Math.min(height-30,p.y-28));
       for(let tries=0;tries<8&&used.some(box=>x<box.x+box.w&&x+w>box.x&&y<box.y+26&&y+26>box.y);tries++)y=y+29<height-28?y+29:Math.max(4,y-58);
       used.push({x,y,w});ctx.strokeStyle='#91a4b5';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(x+4,y+13);ctx.stroke();

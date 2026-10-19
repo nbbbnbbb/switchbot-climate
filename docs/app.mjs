@@ -1,10 +1,10 @@
 import {PLUG_COLORS,plugPoints,plugLabel} from './plugs.mjs?v=9';
-import {visibleClimateSensors} from './devices.mjs?v=9';
+import {visibleClimateSensors,labelClimateSensors} from './devices.mjs?v=10';
 import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=7';
 import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=7';
 import {readSharedSettings} from './settings-store.mjs?v=7';
-import {HeatmapViewer} from './heatmap.mjs?v=9';
-import {renderChart,renderPlugStates} from './graph.mjs?v=9';
+import {HeatmapViewer} from './heatmap.mjs?v=10';
+import {renderChart,renderPlugStates,createChartLink} from './graph.mjs?v=10';
 const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
@@ -51,6 +51,7 @@ async function load(){
   finally{busy=false;$('refresh').disabled=false;}
 }
 function render(){
+  sensors=labelClimateSensors(sensors,settings);
   const times=sensors.map(s=>Date.parse(s.collectedAt)).filter(Number.isFinite), last=times.length?Math.max(...times):null;
   const stale=!last||Date.now()-last>settings.staleMinutes*60000;
   const healthy=status.state==='ok'&&!stale;
@@ -62,7 +63,7 @@ function render(){
   if(!demo&&last&&stale&&!$('notice').textContent)notify('最後の取得から'+settings.staleMinutes+'分以上経過しています。収集が遅延または停止している可能性があります。表示値の取得日時を確認してください。');
   $('sensor-cards').replaceChildren();
   sensors.forEach((s,i)=>{
-    const card=el('article',undefined,'sensor-card');card.style.setProperty('--sensor',COLORS[i%COLORS.length]);
+    const card=el('article',undefined,'sensor-card'+(s.outdoor?' outdoor-card':''));card.style.setProperty('--sensor',COLORS[i%COLORS.length]);
     const title=el('h2',undefined,'sensor-name');title.append(el('i'),document.createTextNode(s.name));card.append(title);
     const values=el('div',undefined,'card-values');
     for(const [key,label,unit]of [['temperature','温度','°C'],['humidity','湿度','%']]){const box=el('div');box.append(el('small',label));const number=el('div',finite(s[key])?s[key].toFixed(key==='temperature'?1:0):'—','value');number.append(el('span',unit));box.append(number);values.append(box);}card.append(values);
@@ -78,17 +79,17 @@ function render(){
     const stale=p.state!=='ok'||isStale(p.collectedAt,Date.now(),settings.staleMinutes);card.append(el('p',(stale?'最終取得値 · ':'取得 ')+(p.collectedAt?date.format(Date.parse(p.collectedAt)):'未取得'),'card-time'+(stale?' stale':'')));$('sensor-cards').append(card);
   });
   $('plug-legend').replaceChildren();plugs.forEach((p,i)=>{const label=el('label');label.style.setProperty('--sensor',PLUG_COLORS[i%PLUG_COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hiddenPlugs.has(p.id);input.addEventListener('change',()=>{input.checked?hiddenPlugs.delete(p.id):hiddenPlugs.add(p.id);draw();});label.append(input,document.createTextNode((i+1)+'. '+p.name+'（W・ON/OFF）'));$('plug-legend').append(label);});
-  $('legend').replaceChildren();sensors.forEach((s,i)=>{const label=el('label');label.style.setProperty('--sensor',COLORS[i%COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hidden.has(s.id);input.addEventListener('change',()=>{input.checked?hidden.delete(s.id):hidden.add(s.id);draw();});label.append(input,document.createTextNode(s.name));$('legend').append(label);});draw();
+  $('legend').replaceChildren();sensors.forEach((s,i)=>{const label=el('label',undefined,s.outdoor?'outdoor-legend':undefined);label.style.setProperty('--sensor',COLORS[i%COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hidden.has(s.id);input.addEventListener('change',()=>{input.checked?hidden.delete(s.id):hidden.add(s.id);draw();});label.append(input,document.createTextNode(s.name));$('legend').append(label);});draw();
 }
 function selectedRows(){return rows.filter(r=>Date.parse(r.at)>=loadedAt-days*86400000);}
 function draw(){
   const start=loadedAt-days*86400000,end=loadedAt;
   $('range-label').textContent=date.format(start)+' – '+date.format(end);
   heatmap.update({sensors,rows,settings,start,end,demo});
-  let has=false;
+  let has=false;const chartLink=createChartLink();
   for(const metric of ['temperature','humidity']){
     const series=sensors.map((s,i)=>({...s,color:COLORS[i%COLORS.length],points:pointsFor(rows,s.id,metric,start)})).filter(s=>!hidden.has(s.id));
-    has=renderChart({chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo})||has;
+    has=renderChart({chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo,link:chartLink})||has;
   }
   const plugSeries=plugs.map((p,i)=>({...p,number:i+1,color:PLUG_COLORS[i%PLUG_COLORS.length],points:plugPoints(rows,p.id,start-300000,end)})).filter(p=>!hiddenPlugs.has(p.id));
   const showPower=settings.plugOverlay.showPower,showState=settings.plugOverlay.showState;

@@ -6,7 +6,7 @@
   <meta name="description" content="SwitchBot温湿度計の記録を、日々の変化がわかるグラフで。">
   <meta name="color-scheme" content="light">
   <title>Climate Log — 温度と湿度の記録</title>
-  <link rel="stylesheet" href="./style.css?v=9">
+  <link rel="stylesheet" href="./style.css?v=10">
 </head>
 <body>
   <header class="topbar"><a class="brand" href="./"><span class="brand-icon" aria-hidden="true">◒</span> Climate Log</a><span class="top-caption">温度と湿度の記録</span><a class="settings-link" href="./settings.html">設定</a><button id="refresh" class="refresh" type="button">↻ <span>更新</span></button></header>
@@ -21,7 +21,7 @@
         <div id="plug-states-wrap" class="plug-states-wrap"><svg tabindex="0" id="chart-plug-states" role="img" aria-label="除湿機と加湿機のON／OFF履歴"></svg><div id="tooltip-plug-states" class="tooltip" role="tooltip" hidden></div></div>
         <div id="plug-legend" class="legend plug-legend" aria-label="消費電力グラフに表示するプラグ"></div>
         <p id="plug-note" class="field-hint plug-note">プラグミニA：除湿機／プラグミニB：加湿機。上の湿度グラフと同じ時間軸です。帯は濃い色がON・薄い色がOFF（取得から最大5分）、空白は未取得です。</p>
-      </section></div></div><div class="chart-footer"><span>縦線は30分ごと・正時を強調（JST）／線を指すと1台の取得値を表示</span><button id="csv" class="text-button" type="button" disabled>CSVをダウンロード ↓</button></div></section>
+      </section></div></div><div class="chart-footer"><span>縦線は30分ごと・正時を強調（JST）／線を指すと温度・湿度の同時刻を連動表示／外気は太線</span><button id="csv" class="text-button" type="button" disabled>CSVをダウンロード ↓</button></div></section>
     <section class="spatial-panel" aria-labelledby="heat-title">
       <div class="panel-heading"><div><p class="eyebrow">SPATIAL CLIMATE</p><h2 id="heat-title">恒温室の立体ヒートマップ</h2><p class="panel-subtitle">測定点から推定した空間の分布を、時間とともに。</p></div></div>
       <div class="heat-toolbar"><div role="tablist" aria-label="ヒートマップの表示項目" class="heat-tabs"><button id="heat-temperature-tab" type="button" role="tab" data-heat-metric="temperature" aria-selected="true" aria-controls="heat-visual">温度 °C</button><button id="heat-humidity-tab" type="button" role="tab" data-heat-metric="humidity" aria-selected="false" aria-controls="heat-visual">湿度 %</button></div><span id="heat-live-label" class="live-pill">最新の記録</span><a href="./settings.html#placement-title" class="text-button">寸法・センサー配置を設定 →</a></div>
@@ -35,6 +35,6 @@
     <section class="details" id="summary-section"><div><p class="eyebrow">AT A GLANCE</p><h2>期間のまとめ</h2><p>温度・湿度を同じ期間で比較します。</p></div><div class="table-wrap"><table><thead><tr><th rowspan="2" scope="col">センサー</th><th colspan="3" scope="colgroup">温度 °C</th><th colspan="3" scope="colgroup">湿度 %</th></tr><tr><th>最低</th><th>平均</th><th>最高</th><th>最低</th><th>平均</th><th>最高</th></tr></thead><tbody id="summary"></tbody></table></div></section>
     <details class="readings" id="readings-section"><summary>グラフの値を表で確認する（直近100件）</summary><div class="table-wrap"><table><thead><tr><th>取得日時（JST）</th><th>センサー</th><th>温度 °C</th><th>湿度 %</th></tr></thead><tbody id="readings"></tbody></table></div></details>
     <footer><span>Climate Log <span class="footer-divider">/</span> Powered by SwitchBot Open API</span><span id="cadence-label">約2分ごとに収集・公開／画面は60秒ごとに再読込</span><p>実行遅延やクラウド側の更新間隔により、リアルタイムの測定値とは異なる場合があります。<span id="gap-label">20分を超える取得の空白は線をつなぎません。</span></p></footer>
-  </main><script type="module" src="./app.mjs?v=9"></script>
+  </main><script type="module" src="./app.mjs?v=10"></script>
 </body>
 </html>

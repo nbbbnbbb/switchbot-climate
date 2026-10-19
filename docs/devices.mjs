@@ -8,3 +8,11 @@ export function visibleClimateSensors(sensors=[]) {
       && !name.startsWith('ハブミニ') && !/CO2/i.test(name+' '+(s.deviceType??''));
   });
 }
+import {insideRoom} from './spatial.mjs?v=9';
+export function labelClimateSensors(sensors,settings){
+  return sensors.map(s=>{
+    const sourceName=s.sourceName??s.name,p=settings.sensorPositions[s.id];
+    const outdoor=Boolean(p&&!insideRoom(p,settings.room));
+    return{...s,sourceName,outdoor,name:outdoor&&!sourceName.endsWith('（外気）')?sourceName+'（外気）':sourceName};
+  });
+}

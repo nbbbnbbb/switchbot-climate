@@ -1,3 +1,4 @@
+import {labelClimateSensors} from './devices.mjs?v=10';
 import {insideRoom,planBounds,orthographicProjection} from './spatial.mjs?v=7';
 const $=id=>document.getElementById(id);
 const svg=(tag,attrs={},label)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(label!==undefined)e.textContent=label;return e;};
@@ -44,7 +45,8 @@ export class PositionEditor{
     this.ensure();const p=this.positions[this.selected];p.x=Math.max(-100,Math.min(200,Math.round((b.x0+(cursor.x-left)/scale)*100)/100));p[view==='plan'?'y':'z']=Math.max(-100,Math.min(200,Math.round((range[1]-(cursor.y-top)/scale)*100)/100));this.fields();this.changed();this.draw();
   }
   draw(){
-    const r=this.room,b=this.drag?.bounds??planBounds(r,Object.values(this.positions));
+    const r=this.room,b=this.drag?.bounds??planBounds(r,Object.values(this.positions)),sensors=labelClimateSensors(this.sensors,{room:r,sensorPositions:this.positions});
+    for(const option of $('placement-sensor').options){const sensor=sensors.find(s=>s.id===option.value);if(sensor)option.textContent=sensor.name;}
     for(const view of ['plan','front']){
       const chart=$('placement-'+view),{range,scale,left,top}=this.projection(view,b),x=v=>left+(v-b.x0)*scale,y=v=>top+(range[1]-v)*scale;
       chart.replaceChildren(svg('title',{},view==='plan'?'平面図。XとYを設定。':'正面図。Xと高さZを設定。'));
@@ -55,12 +57,12 @@ export class PositionEditor{
       chart.append(svg('polygon',{points:coords.map(p=>x(p[0])+','+y(p[1])).join(' '),fill:'#dceaf480',stroke:'#7597b2','stroke-width':2}));
       if(view==='plan')for(const[label,a,c]of [['A',0,0],['B',r.width,0],['C',r.apexX,r.depth]])chart.append(svg('text',{x:x(a)+7,y:y(c)-8,fill:'#3d607e','font-size':13},label));
       else chart.append(svg('line',{x1:x(r.apexX),x2:x(r.apexX),y1:y(0),y2:y(r.height),stroke:'#7597b2','stroke-dasharray':'4 4'}));
-      this.sensors.forEach((s,i)=>{const p=this.positions[s.id];if(!p)return;const selected=s.id===this.selected,cx=x(p.x),cy=y(p[view==='plan'?'y':'z']);const g=svg('g',{'data-position-id':s.id,role:'button',tabindex:0,'aria-label':s.name+'の位置',class:'placement-point'});
+      sensors.forEach((s,i)=>{const p=this.positions[s.id];if(!p)return;const selected=s.id===this.selected,cx=x(p.x),cy=y(p[view==='plan'?'y':'z']);const g=svg('g',{'data-position-id':s.id,role:'button',tabindex:0,'aria-label':s.name+'の位置',class:'placement-point'});
         g.append(svg('title',{},s.name),svg('circle',{cx,cy,r:selected?12:10,fill:selected?'#206eab':insideRoom(p,r)?'#788ea2':'#b87637',stroke:'white','stroke-width':2}),svg('text',{x:cx,y:cy+4,'text-anchor':'middle',fill:'white','font-size':11,'pointer-events':'none'},i+1));
         g.addEventListener('focus',()=>{if(this.selected!==s.id){this.selected=s.id;$('placement-sensor').value=s.id;this.fields();}});chart.append(g);
       });
     }
-    $('placement-summary').replaceChildren();this.sensors.forEach((s,i)=>{const p=this.positions[s.id],button=document.createElement('button');button.type='button';button.className='placement-summary-item'+(s.id===this.selected?' selected':'');button.textContent=(i+1)+'. '+s.name+' / '+(p?(insideRoom(p,r)?'室内':'室外')+' ('+[p.x,p.y,p.z].map(v=>v.toFixed(2)).join(', ')+')':'未配置');button.addEventListener('click',()=>{this.selected=s.id;$('placement-sensor').value=s.id;this.fields();this.draw();});$('placement-summary').append(button);});
+    $('placement-summary').replaceChildren();sensors.forEach((s,i)=>{const p=this.positions[s.id],button=document.createElement('button');button.type='button';button.className='placement-summary-item'+(s.id===this.selected?' selected':'');button.textContent=(i+1)+'. '+s.name+' / '+(p?(insideRoom(p,r)?'室内':'室外')+' ('+[p.x,p.y,p.z].map(v=>v.toFixed(2)).join(', ')+')':'未配置');button.addEventListener('click',()=>{this.selected=s.id;$('placement-sensor').value=s.id;this.fields();this.draw();});$('placement-summary').append(button);});
     $('position-location').textContent=this.positions[this.selected]?(insideRoom(this.positions[this.selected],r)?'室内：補間に使用できます。':'室外：点と実測値を表示し、室内の補間には使いません。'):'未配置：2面図をクリックするか「このセンサーを配置」をオンにしてください。';
   }
 }

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="description" content="Climate Logの全閲覧者に適用する共有表示設定。"><title>共有設定 — Climate Log</title><link rel="stylesheet" href="./style.css?v=9"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="description" content="Climate Logの全閲覧者に適用する共有表示設定。"><title>共有設定 — Climate Log</title><link rel="stylesheet" href="./style.css?v=10"></head>
 <body>
   <header class="topbar"><a class="brand" href="./"><span class="brand-icon" aria-hidden="true">◒</span> Climate Log</a><span class="top-caption">共有設定</span><a class="settings-link" href="./">グラフへ戻る →</a></header>
   <main class="settings-main">
@@ -41,5 +41,5 @@
     <footer><span>Climate Log / 共有設定</span><span>設定は全閲覧者に適用・センサーの記録は継続</span></footer>
   </main>
   <dialog id="admin-dialog" aria-labelledby="admin-title"><form id="admin-form"><div class="dialog-heading"><div><p class="eyebrow">ADMIN ACCESS</p><h2 id="admin-title">共有設定を保存</h2></div><button id="close-admin" type="button" class="icon-button" aria-label="認証画面を閉じる">×</button></div><p>GitHubの書き込み権限で認証します。この設定は、すべての閲覧者の表示に適用されます。</p><label for="admin-token">GitHubアクセストークン</label><input id="admin-token" type="password" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" required placeholder="github_pat_…"><p class="field-hint">トークンはこの保存処理にだけ使い、ブラウザーや公開ファイルには保存しません。SwitchBotのToken・Secretとは別です。</p><details><summary>GitHubトークンの準備方法</summary><ol><li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">GitHubでFine-grained tokenを作成</a></li><li>Repository accessで「Only select repositories」を選び、<strong>switchbot-climate</strong>だけを指定</li><li>Repository permissionsの<strong>Contents → Read and write</strong>を指定</li><li>作成したトークンをこの入力欄へ貼り付け</li></ol><p>必要な権限はこのリポジトリのContentsだけです。</p></details><div id="admin-error" class="form-error" role="alert" hidden></div><button id="confirm-save" class="primary-button" type="submit">認証して全員に保存</button></form></dialog>
-  <script type="module" src="./settings-page.mjs?v=9"></script>
+  <script type="module" src="./settings-page.mjs?v=10"></script>
 </body></html>

@@ -54,3 +54,9 @@ export function timeTicks(start,end,pixels=600){
   for(let at=Math.ceil(start/halfHour)*halfHour;at<=end;at+=halfHour)ticks.push({at,wholeHour:(at+offset)%hour===0,midnight:(at+offset)%86400000===0,label:(at+offset)%labelStep===0});
   return ticks;
 }
+// Synchronised cursors use an actual reading at the exact selected timestamp.
+export function pointAtTime(points,at){
+  let lo=0,hi=points.length;
+  while(lo<hi){const mid=(lo+hi)>>1;if(points[mid].at<at)lo=mid+1;else hi=mid;}
+  return points[lo]?.at===at?points[lo]:null;
+}

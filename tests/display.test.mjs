@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {visibleClimateSensors} from '../docs/devices.mjs';
+import {visibleClimateSensors,labelClimateSensors} from '../docs/devices.mjs';
 import {plugLabel} from '../docs/plugs.mjs';
 import {frontViewYaw} from '../docs/spatial.mjs';
 
@@ -18,6 +18,17 @@ test('plug purpose descriptions preserve app names, including normalized spaces 
   assert.equal(plugLabel({name:'プラグミニ A'}),'プラグミニ A（除湿機）');
   assert.equal(plugLabel({name:'プラグミニ Ｂ'}),'プラグミニ Ｂ（加湿機）');
   assert.equal(plugLabel({name:'別の機器'}),'別の機器');
+});
+test('outdoor labels follow saved geometry, preserve names and update when a sensor moves indoors',()=>{
+  const sensors=[{id:'outside',name:'温湿度計4'},{id:'inside',name:'室内'},{id:'unplaced',name:'防水温湿度計'}];
+  const settings={room:{width:2,depth:1.73,height:2.4,apexX:1},sensorPositions:{outside:{x:.82,y:1.67,z:1.21},inside:{x:1,y:.5,z:1}}};
+  const labelled=labelClimateSensors(sensors,settings);
+  assert.equal(labelled[0].name,'温湿度計4（外気）');assert.equal(labelled[0].outdoor,true);
+  assert.equal(labelled[1].name,'室内');assert.equal(labelled[2].outdoor,false);
+  assert.equal(labelClimateSensors(labelled,settings)[0].name,'温湿度計4（外気）');
+  settings.sensorPositions.outside={x:1,y:.5,z:1};
+  assert.equal(labelClimateSensors(labelled,settings)[0].name,'温湿度計4');
+  assert.equal(sensors[0].name,'温湿度計4');
 });
 test('front camera points toward C with C nearer than A and B for symmetric and asymmetric rooms',()=>{
   for(const apexX of [0,1,2]){

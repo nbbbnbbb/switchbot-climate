@@ -1,11 +1,19 @@
 import {stateIntervals,powerDomain} from './plugs.mjs?v=9';
-import {segments,pickPoint,timeTicks} from './chart.mjs?v=7';
+import {segments,pickPoint,timeTicks,pointAtTime} from './chart.mjs?v=10';
 import {axisDomain} from './settings-model.mjs?v=7';
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
 const svg=(tag,attrs,text)=>{const n=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
 const text=(tag,value,cls)=>{const n=document.createElement(tag);n.textContent=value;if(cls)n.className=cls;return n;};
-export function renderChart({chart,tooltip,empty,series,start,end,metric,settings,demo=false}){
+export function createChartLink(){
+  const charts=new Map();
+  return{
+    register(metric,handlers){charts.set(metric,handlers);},
+    select(source,selection){for(const[metric,chart]of charts)if(metric!==source)chart.select(selection);},
+    clear(source){for(const[metric,chart]of charts)if(metric!==source)chart.clear();},
+  };
+}
+export function renderChart({chart,tooltip,empty,series,start,end,metric,settings,demo=false,link=null}){
   tooltip.hidden=true;
   const isPower=metric==='power',unit=isPower?'W':metric==='temperature'?'°C':'%',width=Math.max(280,chart.parentElement.clientWidth),height=isPower?110:330;
   const label=isPower?'消費電力':metric==='temperature'?'温度':'湿度',gap=(isPower?Math.min(settings.gapMinutes,5):settings.gapMinutes)*60000;
@@ -31,25 +39,32 @@ export function renderChart({chart,tooltip,empty,series,start,end,metric,setting
     }
   }
   const plots=svg('g',{'clip-path':`url(#${clipId})`});chart.append(plots);
-  for(const s of series)for(const group of segments(s.points,gap)){
-    plots.append(svg('path',{d:group.map((p,i)=>(i?'L':'M')+x(p.at).toFixed(2)+','+y(p.value).toFixed(2)).join(' '),class:'series'+(isPower?' plug-power':''),stroke:s.color,'stroke-width':settings.lineWidth,style:`stroke-width:${settings.lineWidth}`}));
-    if(settings.showPoints||group.length===1)for(const p of group)plots.append(svg('circle',{cx:x(p.at),cy:y(p.value),r:settings.showPoints?2.5:3,fill:s.color}));
+  for(const s of [...series].sort((a,b)=>Number(Boolean(a.outdoor))-Number(Boolean(b.outdoor))))for(const group of segments(s.points,gap)){
+    const lineWidth=s.outdoor?Math.max(4,settings.lineWidth+2):settings.lineWidth;
+    plots.append(svg('path',{d:group.map((p,i)=>(i?'L':'M')+x(p.at).toFixed(2)+','+y(p.value).toFixed(2)).join(' '),class:'series'+(isPower?' plug-power':'')+(s.outdoor?' outdoor-series':''),stroke:s.color,'stroke-width':lineWidth,style:`stroke-width:${lineWidth}`,'data-sensor':s.id??''}));
+    if(settings.showPoints||group.length===1)for(const p of group)plots.append(svg('circle',{cx:x(p.at),cy:y(p.value),r:s.outdoor?3.5:settings.showPoints?2.5:3,fill:s.color}));
   }
-  const focus=svg('g',{'pointer-events':'none',visibility:'hidden'});
+  const focus=svg('g',{'pointer-events':'none',visibility:'hidden',class:'chart-focus'});
   const rule=svg('line',{y1:top,y2:bottom,stroke:'#9eabbc','stroke-dasharray':'3 4','stroke-width':1});
   const dot=svg('circle',{r:5,stroke:'#fff','stroke-width':2});focus.append(rule,dot);chart.append(focus);
   const hit=svg('rect',{x:left,y:top,width:right-left,height:bottom-top,class:'hit'});chart.append(hit);
   let pinned=false,selected=null;
-  function hide(){tooltip.hidden=true;focus.setAttribute('visibility','hidden');selected=null;}
-  function show(match){
+  function hide(linked=false){tooltip.hidden=true;focus.setAttribute('visibility','hidden');selected=null;if(!linked)link?.clear(metric);}
+  function show(match,linked=false){
     selected=match;const {series:s,point:p}=match;
-    tooltip.replaceChildren(text('div',s.name,'tooltip-name'),text('div',isPower?p.value.toFixed(1)+' W · '+p.power.toUpperCase():p.value.toFixed(metric==='temperature'?1:0)+' '+unit,'tooltip-value'),text('div',date.format(p.at)+' 取得','tooltip-time'));
+    const valid=Number.isFinite(p.value);
+    tooltip.replaceChildren(text('div',s.name,'tooltip-name'),text('div',!valid?'この時刻の記録なし':isPower?p.value.toFixed(1)+' W · '+p.power.toUpperCase():p.value.toFixed(metric==='temperature'?1:0)+' '+unit,'tooltip-value'+(valid?'':' missing')),text('div',date.format(p.at)+(valid?' 取得':' 選択'),'tooltip-time'));
     tooltip.style.setProperty('--sensor',s.color);tooltip.hidden=false;
-    const bounds=chart.getBoundingClientRect(),px=x(p.at)/width*bounds.width,py=y(p.value)/height*bounds.height;
+    const bounds=chart.getBoundingClientRect(),px=x(p.at)/width*bounds.width,py=(valid?y(p.value):(top+bottom)/2)/height*bounds.height;
     tooltip.style.left=Math.max(4,Math.min(bounds.width-tooltip.offsetWidth-4,px+16))+'px';
     tooltip.style.top=Math.max(4,Math.min(bounds.height-tooltip.offsetHeight-4,py-tooltip.offsetHeight-16))+'px';
-    rule.setAttribute('x1',x(p.at));rule.setAttribute('x2',x(p.at));dot.setAttribute('cx',x(p.at));dot.setAttribute('cy',y(p.value));dot.setAttribute('fill',s.color);focus.setAttribute('visibility','visible');
+    rule.setAttribute('x1',x(p.at));rule.setAttribute('x2',x(p.at));dot.setAttribute('cx',x(p.at));dot.setAttribute('cy',valid?y(p.value):top);dot.setAttribute('fill',s.color);dot.setAttribute('visibility',valid?'visible':'hidden');focus.setAttribute('visibility','visible');focus.setAttribute('data-sensor',s.id??'');focus.setAttribute('data-at',String(p.at));
+    if(!linked)link?.select(metric,{id:s.id,at:p.at});
   }
+  link?.register(metric,{
+    select({id,at}){pinned=false;const s=series.find(s=>s.id===id);if(!s){hide(true);return;}show({series:s,point:pointAtTime(s.points,at)??{at,value:null}},true);},
+    clear(){pinned=false;hide(true);},
+  });
   function point(event){
     const bounds=chart.getBoundingClientRect(),sx=bounds.width/width,sy=bounds.height/height;
     const cursor={x:event.clientX-bounds.left,y:event.clientY-bounds.top};

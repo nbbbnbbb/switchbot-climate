@@ -1,8 +1,8 @@
-import {visibleClimateSensors} from './devices.mjs?v=9';
+import {visibleClimateSensors,labelClimateSensors} from './devices.mjs?v=10';
 import {plugLabel} from './plugs.mjs?v=9';
 import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=7';
 import {readSharedSettings,readRepositorySettings,saveSharedSettings} from './settings-store.mjs?v=7';
-import {PositionEditor} from './position-editor.mjs?v=7';
+import {PositionEditor} from './position-editor.mjs?v=10';
 const $=id=>document.getElementById(id);
 const positionEditor=new PositionEditor();
 let plugs=[],sensors=[],expectedSha=null,loaded=false,dirty=false,saving=false,pending=null;
@@ -25,7 +25,7 @@ function fill(input){
   for(const key of ['defaultPeriodHours','defaultMetric','refreshSeconds','gapMinutes','staleMinutes','lineWidth'])$(key).value=settings[key];
   for(const key of ['showCards','showSummary','showReadings','showPoints'])$(key).checked=settings[key];
   $('settings-sensors').replaceChildren();
-  for(const s of sensors){const label=document.createElement('label');label.className='check';const input=document.createElement('input');input.type='checkbox';input.dataset.sensor=s.id;input.checked=settings.visibleSensorIds===null||settings.visibleSensorIds.includes(s.id);label.append(input,document.createTextNode(s.name));$('settings-sensors').append(label);}
+  for(const s of labelClimateSensors(sensors,settings)){const label=document.createElement('label');label.className='check';const input=document.createElement('input');input.type='checkbox';input.dataset.sensor=s.id;input.checked=settings.visibleSensorIds===null||settings.visibleSensorIds.includes(s.id);label.append(input,document.createTextNode(s.name));$('settings-sensors').append(label);}
   if(!sensors.length)$('settings-sensors').textContent='センサーがまだ登録されていません。';
 }
 function formSettings(){
