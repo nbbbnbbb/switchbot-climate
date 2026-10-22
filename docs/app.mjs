@@ -1,7 +1,8 @@
 import {createLiveReader,attemptedTime,mergeHistory} from './live-data.mjs?v=11';
+import {timeWindow,anchorAtPosition,rowsInWindow} from './time-window.mjs?v=12';
 import {PLUG_COLORS,plugPoints,plugLabel} from './plugs.mjs?v=9';
 import {visibleClimateSensors,labelClimateSensors} from './devices.mjs?v=10';
-import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=7';
+import {COLORS, pointsFor, stats, csvCell, isStale} from './chart.mjs?v=12';
 import {DEFAULT_SETTINGS,normalizeSettings} from './settings-model.mjs?v=7';
 import {readSharedSettings} from './settings-store.mjs?v=7';
 import {HeatmapViewer} from './heatmap.mjs?v=10';
@@ -10,6 +11,7 @@ const $=id=>document.getElementById(id);
 const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'});
 let plugs=[],sensors=[],rows=[],status={},days=1,metric='temperature',demo=false,busy=false,loadedAt=Date.now();
+let rangeAnchor=null,rangeDraw=null;
 const hidden=new Set(),hiddenPlugs=new Set();
 const heatmap=new HeatmapViewer();
 const readLive=createLiveReader();
@@ -50,8 +52,9 @@ async function load(){
     }
     if(!latest||!state)throw new Error('No available data');
     sensors=visibleClimateSensors(latest.sensors);plugs=(latest.plugs??[]).map(p=>({...p,name:plugLabel(p)}));applySettings(previewSettings||shared||settings);
-    const cutoff=new Date(Date.now()-days*86400000).toISOString().slice(0,7);
-    const months=(manifest?.months??[]).filter(m=>/^\d{4}-\d{2}$/.test(m)&&m>=cutoff);
+    // Load every retained month so dragging into older history never shows an
+    // empty range merely because it falls outside the initial period tab.
+    const months=(manifest?.months??[]).filter(m=>/^\d{4}-\d{2}$/.test(m));
     const results=await Promise.allSettled(months.map(m=>json((direct?'https://raw.githubusercontent.com/nbbbnbbb/switchbot-climate/main/docs/data/history/':'./data/history/')+m+'.json')));
     sensors=visibleClimateSensors(latest.sensors);status=state;rows=mergeHistory(results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value),live?.rows??[]);loadedAt=Date.now();
     const partial=results.some(r=>r.status==='rejected')||!manifest;
@@ -91,14 +94,33 @@ function render(){
   $('plug-legend').replaceChildren();plugs.forEach((p,i)=>{const label=el('label');label.style.setProperty('--sensor',PLUG_COLORS[i%PLUG_COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hiddenPlugs.has(p.id);input.addEventListener('change',()=>{input.checked?hiddenPlugs.delete(p.id):hiddenPlugs.add(p.id);draw();});label.append(input,document.createTextNode((i+1)+'. '+p.name+'（W・ON/OFF）'));$('plug-legend').append(label);});
   $('legend').replaceChildren();sensors.forEach((s,i)=>{const label=el('label',undefined,s.outdoor?'outdoor-legend':undefined);label.style.setProperty('--sensor',COLORS[i%COLORS.length]);const input=el('input');input.type='checkbox';input.checked=!hidden.has(s.id);input.addEventListener('change',()=>{input.checked?hidden.delete(s.id):hidden.add(s.id);draw();});label.append(input,document.createTextNode(s.name));$('legend').append(label);});draw();
 }
-function selectedRows(){return rows.filter(r=>Date.parse(r.at)>=loadedAt-days*86400000);}
+function currentWindow(){return timeWindow(rows,days*86400000,loadedAt,rangeAnchor);}
+function selectedRows(){const {start,end}=currentWindow();return rowsInWindow(rows,start,end);}
+function syncRangeControls(window){
+  const slider=$('history-time');
+  slider.max=String(window.maxPosition);slider.value=String(window.position);slider.disabled=window.disabled;
+  slider.setAttribute('aria-valuetext',date.format(window.start)+'から'+date.format(window.end)+'まで');
+  $('history-earliest').textContent=date.format(window.minEnd-days*86400000);
+  $('history-latest-time').textContent=date.format(window.maxEnd);
+  $('history-mode').textContent=window.disabled?'表示期間に全記録を表示':window.following?'最新に追従':'過去の範囲を表示中';
+  $('history-latest').disabled=window.following;
+  $('history-prev').disabled=window.disabled||window.end<=window.minEnd;
+  $('history-next').disabled=window.disabled||window.following||window.end>=window.maxEnd;
+}
+function moveRange(anchor){
+  heatmap.stop();rangeAnchor=anchor;
+  // Coalesce fast pointer input without issuing data/API requests while dragging.
+  cancelAnimationFrame(rangeDraw);rangeDraw=requestAnimationFrame(()=>{rangeDraw=null;draw();});
+}
 function draw(){
-  const start=loadedAt-days*86400000,end=loadedAt;
+  const window=currentWindow(),{start,end}=window;
+  if(rangeAnchor!==null)rangeAnchor=end;
+  syncRangeControls(window);
   $('range-label').textContent=date.format(start)+' – '+date.format(end);
   heatmap.update({sensors,rows,settings,start,end,demo});
   let has=false;const chartLink=createChartLink();
   for(const metric of ['temperature','humidity']){
-    const series=sensors.map((s,i)=>({...s,color:COLORS[i%COLORS.length],points:pointsFor(rows,s.id,metric,start)})).filter(s=>!hidden.has(s.id));
+    const series=sensors.map((s,i)=>({...s,color:COLORS[i%COLORS.length],points:pointsFor(rows,s.id,metric,start,end)})).filter(s=>!hidden.has(s.id));
     has=renderChart({chart:$('chart-'+metric),tooltip:$('tooltip-'+metric),empty:$('chart-empty-'+metric),series,start,end,metric,settings,demo,link:chartLink})||has;
   }
   const plugSeries=plugs.map((p,i)=>({...p,number:i+1,color:PLUG_COLORS[i%PLUG_COLORS.length],points:plugPoints(rows,p.id,start-300000,end)})).filter(p=>!hiddenPlugs.has(p.id));
@@ -110,7 +132,7 @@ function draw(){
   $('summary').replaceChildren();
   for(const s of sensors.filter(s=>!hidden.has(s.id))){
     const row=el('tr');row.append(el('td',s.name));
-    for(const metric of ['temperature','humidity']){const summary=stats(pointsFor(rows,s.id,metric,start));for(const key of ['min','average','max'])row.append(el('td',summary?summary[key].toFixed(1):'—'));}
+    for(const metric of ['temperature','humidity']){const summary=stats(pointsFor(rows,s.id,metric,start,end));for(const key of ['min','average','max'])row.append(el('td',summary?summary[key].toFixed(1):'—'));}
     $('summary').append(row);
   }
   const visible=new Set(sensors.filter(s=>!hidden.has(s.id)).map(s=>s.id)),names=new Map(sensors.map(s=>[s.id,s.name]));let count=0;$('readings').replaceChildren();
@@ -118,14 +140,20 @@ function draw(){
   $('csv').disabled=!has;
 }
 function sample(){
-  demo=!demo;hidden.clear();plugs=[];hiddenPlugs.clear();
+  demo=!demo;rangeAnchor=null;hidden.clear();plugs=[];hiddenPlugs.clear();
   if(!demo){sensors=[];rows=[];status={state:'unconfigured'};notify('');render();load();return;}
   loadedAt=Date.now();rows=[];sensors=[{id:'sample-1',name:'サンプル A'},{id:'sample-2',name:'サンプル B'}];
   for(let i=0;i<=288;i++){const at=new Date(loadedAt-(288-i)*300000).toISOString(),values={};sensors.forEach((s,j)=>{values[s.id]={temperature:+(23+j*1.5+1.8*Math.sin(i/45+j)+.15*Math.cos(i/4)).toFixed(1),humidity:Math.round(52+j*5-6*Math.sin(i/45+j))};});rows.push({at,values});}
   sensors=sensors.map(s=>({...s,...rows.at(-1).values[s.id],collectedAt:rows.at(-1).at,state:'ok'}));status={state:'ok'};notify('サンプルデータを表示しています。実際の測定値ではありません。');render();
 }
 $('refresh').addEventListener('click',()=>demo?render():load());$('demo-toggle').addEventListener('click',sample);
-document.querySelectorAll('[data-days]').forEach(button=>button.addEventListener('click',()=>{days=Number(button.dataset.days);document.querySelectorAll('[data-days]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));demo?draw():load();}));
+document.querySelectorAll('[data-days]').forEach(button=>button.addEventListener('click',()=>{days=Number(button.dataset.days);heatmap.stop();document.querySelectorAll('[data-days]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));draw();}));
+$('history-time').addEventListener('input',()=>moveRange(anchorAtPosition(currentWindow(),$('history-time').value)));
+$('history-latest').addEventListener('click',()=>moveRange(null));
+for(const [id,direction]of [['history-prev',-1],['history-next',1]])$(id).addEventListener('click',()=>{
+  const window=currentWindow(),end=Math.max(window.minEnd,Math.min(window.maxEnd,window.end+direction*days*86400000));
+  moveRange(end>=window.maxEnd?null:end);
+});
 
 $('csv').addEventListener('click',()=>{const names=new Map(sensors.map(s=>[s.id,s.name]));const records=[['取得日時（UTC）','センサー','温度（°C）','湿度（%）','データ種別']];for(const row of selectedRows())for(const [id,v]of Object.entries(row.values))if(names.has(id)&&!hidden.has(id))records.push([row.at,names.get(id)||id,v.temperature,v.humidity,demo?'サンプル':'API取得値']);const blob=new Blob(['\ufeff'+records.map(r=>r.map(csvCell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download=(demo?'sample-':'')+'climate-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 load();

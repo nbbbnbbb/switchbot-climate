@@ -20,9 +20,9 @@ export function pickPoint(series,targetAt,cursor,projectX,projectY,{maxDistance=
   }
   return best;
 }
-export function pointsFor(rows, id, metric, since) {
+export function pointsFor(rows, id, metric, since, until=Infinity) {
   return rows.map(r => ({at: Date.parse(r.at), value: r.values?.[id]?.[metric]}))
-    .filter(p => Number.isFinite(p.at) && p.at >= since && Number.isFinite(p.value)).sort((a,b)=>a.at-b.at);
+    .filter(p => Number.isFinite(p.at) && p.at >= since && p.at <= until && Number.isFinite(p.value)).sort((a,b)=>a.at-b.at);
 }
 export function stats(points) {
   if (!points.length) return null;
